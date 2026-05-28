@@ -758,7 +758,7 @@ const dict = {
 
   // Anthropic Advanced (base URL override)
   'anthropic.baseUrl': { ja: 'Anthropic API ベース URL（任意）', en: 'Anthropic API Base URL (optional)', zh: 'Anthropic API Base URL（可选）'},
-  'anthropic.baseUrlDesc': { ja: 'デフォルトの Anthropic API エンドポイントを上書き（プロキシ用）', en: 'Override the default Anthropic API endpoint (for proxies)', zh: '覆盖默认的 Anthropic API 端点（用于代理）'},
+  'anthropic.baseUrlDesc': { ja: '空欄の場合は公式エンドポイントを使用', en: 'Leave empty to use the official endpoint', zh: '留空使用官方默认地址'},
   'anthropic.baseUrlPlaceholder': { ja: 'https://api.anthropic.com', en: 'https://api.anthropic.com', zh: 'https://api.anthropic.com'},
   'anthropic.baseUrlSaved': { ja: 'Anthropic ベース URL を保存しました', en: 'Anthropic base URL saved', zh: 'Anthropic Base URL 已保存'},
   'anthropic.advanced': { ja: '詳細設定', en: 'Advanced', zh: '高级设置'},
