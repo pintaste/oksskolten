@@ -55,16 +55,27 @@ export const OPENAI_MODELS: ModelGroup[] = [
   ]},
 ]
 
+export const DEEPSEEK_MODELS: ModelGroup[] = [
+  { group: 'Standard', models: [
+    { value: 'deepseek-chat', label: 'DeepSeek Chat', pricing: [0.14, 0.28] },
+    { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner', pricing: [0.55, 2.19] },
+  ]},
+]
+
 export const MODELS_BY_PROVIDER: Record<string, ModelGroup[]> = {
   anthropic: ANTHROPIC_MODELS,
   gemini: GEMINI_MODELS,
   openai: OPENAI_MODELS,
+  deepseek: DEEPSEEK_MODELS,
 }
 
 export const DEFAULT_MODELS: Record<string, string> = {
   anthropic: 'claude-haiku-4-5-20251001',
   gemini: 'gemini-2.5-flash',
   openai: 'gpt-4.1-mini',
+  deepseek: 'deepseek-chat',
+  mimo: '',
+  custom: '',
   'claude-code': 'claude-haiku-4-5-20251001',
   ollama: '',
   vllm: '',
@@ -79,18 +90,21 @@ export const TASK_DEFAULTS = {
 } as const
 
 /** LLM providers that require an API key */
-export const LLM_API_PROVIDERS = ['anthropic', 'gemini', 'openai'] as const
+export const LLM_API_PROVIDERS = ['anthropic', 'gemini', 'openai', 'deepseek', 'mimo'] as const
 
 /** Translation service providers that require an API key */
 export const TRANSLATE_SERVICE_PROVIDERS = ['google-translate', 'deepl'] as const
 
 /** All LLM providers selectable for tasks (includes claude-code which uses auth, not API key) */
-export const LLM_TASK_PROVIDERS = [...LLM_API_PROVIDERS, 'claude-code', 'ollama', 'vllm'] as const
+export const LLM_TASK_PROVIDERS = [...LLM_API_PROVIDERS, 'custom', 'claude-code', 'ollama', 'vllm'] as const
 
-export const PROVIDER_LABELS: Record<string, 'provider.anthropic' | 'provider.gemini' | 'provider.openai' | 'provider.claudeCode' | 'provider.ollama' | 'provider.vllm' | 'provider.googleTranslate' | 'provider.deepl'> = {
+export const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'provider.anthropic',
   gemini: 'provider.gemini',
   openai: 'provider.openai',
+  deepseek: 'provider.deepseek',
+  mimo: 'provider.mimo',
+  custom: 'provider.custom',
   'claude-code': 'provider.claudeCode',
   ollama: 'provider.ollama',
   vllm: 'provider.vllm',
@@ -103,6 +117,9 @@ export const SUB_AGENT_MODELS: Record<string, string> = {
   anthropic: 'claude-haiku-4-5-20251001',
   gemini: 'gemini-2.5-flash',
   openai: 'gpt-5-nano',
+  deepseek: 'deepseek-chat',
+  mimo: '',
+  custom: '',
   'claude-code': 'claude-haiku-4-5-20251001',
   ollama: '',
   vllm: '',

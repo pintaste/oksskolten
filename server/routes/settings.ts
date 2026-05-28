@@ -696,4 +696,126 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
       reply.send({ ok: false, error: message })
     }
   })
+
+  // --- DeepSeek endpoints ---
+
+  async function deepseekFetch(path: string): Promise<Response> {
+    const { getDeepSeekApiKey } = await import('../providers/llm/deepseek.js')
+    const apiKey = getDeepSeekApiKey()
+    const headers: Record<string, string> = {}
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+    return fetch(`https://api.deepseek.com${path}`, { headers, signal: AbortSignal.timeout(10_000) })
+  }
+
+  api.get('/api/settings/deepseek/models', async (_request, reply) => {
+    try {
+      const res = await deepseekFetch('/v1/models')
+      if (!res.ok) {
+        reply.send({ models: [] })
+        return
+      }
+      const data = await res.json() as { data?: Array<{ id: string }> }
+      const models = (data.data || []).map(m => ({ name: m.id }))
+      reply.send({ models })
+    } catch {
+      reply.send({ models: [] })
+    }
+  })
+
+  api.get('/api/settings/deepseek/status', async (_request, reply) => {
+    try {
+      const res = await deepseekFetch('/v1/models')
+      if (!res.ok) {
+        reply.send({ ok: false, error: `HTTP ${res.status}` })
+        return
+      }
+      const data = await res.json() as { data?: unknown[] }
+      reply.send({ ok: true, model_count: data.data?.length || 0 })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Connection failed'
+      reply.send({ ok: false, error: message })
+    }
+  })
+
+  // --- Mimo endpoints ---
+
+  async function mimoFetch(path: string): Promise<Response> {
+    const { getMimoApiKey } = await import('../providers/llm/mimo.js')
+    const apiKey = getMimoApiKey()
+    const headers: Record<string, string> = {}
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+    return fetch(`https://api.mimo.ai${path}`, { headers, signal: AbortSignal.timeout(10_000) })
+  }
+
+  api.get('/api/settings/mimo/models', async (_request, reply) => {
+    try {
+      const res = await mimoFetch('/v1/models')
+      if (!res.ok) {
+        reply.send({ models: [] })
+        return
+      }
+      const data = await res.json() as { data?: Array<{ id: string }> }
+      const models = (data.data || []).map(m => ({ name: m.id }))
+      reply.send({ models })
+    } catch {
+      reply.send({ models: [] })
+    }
+  })
+
+  api.get('/api/settings/mimo/status', async (_request, reply) => {
+    try {
+      const res = await mimoFetch('/v1/models')
+      if (!res.ok) {
+        reply.send({ ok: false, error: `HTTP ${res.status}` })
+        return
+      }
+      const data = await res.json() as { data?: unknown[] }
+      reply.send({ ok: true, model_count: data.data?.length || 0 })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Connection failed'
+      reply.send({ ok: false, error: message })
+    }
+  })
+
+  // --- Custom provider endpoints ---
+
+  async function customFetch(path: string): Promise<Response> {
+    const { getCustomBaseUrl, getCustomApiKey } = await import('../providers/llm/custom.js')
+    const baseUrl = getCustomBaseUrl()
+    if (!baseUrl) throw new Error('CUSTOM_BASE_URL_NOT_SET')
+    const apiKey = getCustomApiKey()
+    const headers: Record<string, string> = {}
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+    return fetch(`${baseUrl.replace(/\/+$/, '')}${path}`, { headers, signal: AbortSignal.timeout(10_000) })
+  }
+
+  api.get('/api/settings/custom/models', async (_request, reply) => {
+    try {
+      const res = await customFetch('/v1/models')
+      if (!res.ok) {
+        reply.send({ models: [] })
+        return
+      }
+      const data = await res.json() as { data?: Array<{ id: string }> }
+      const models = (data.data || []).map(m => ({ name: m.id }))
+      reply.send({ models })
+    } catch {
+      reply.send({ models: [] })
+    }
+  })
+
+  api.get('/api/settings/custom/status', async (_request, reply) => {
+    try {
+      const res = await customFetch('/v1/models')
+      if (!res.ok) {
+        reply.send({ ok: false, error: `HTTP ${res.status}` })
+        return
+      }
+      const data = await res.json() as { data?: unknown[] }
+      reply.send({ ok: true, model_count: data.data?.length || 0 })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Connection failed'
+      reply.send({ ok: false, error: message })
+    }
+  })
 }

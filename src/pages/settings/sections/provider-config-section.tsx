@@ -4,7 +4,7 @@ import { fetcher, apiPost, apiPatch } from '../../../lib/fetcher'
 import { PROVIDER_LABELS, LLM_API_PROVIDERS, TRANSLATE_SERVICE_PROVIDERS } from '../../../data/aiModels'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
-import { ExternalLink, CircleDot, CircleCheck, CircleSlash } from 'lucide-react'
+import { ExternalLink, CircleDot, CircleCheck, CircleSlash, ChevronDown } from 'lucide-react'
 import type { Settings } from '../../../hooks/use-settings'
 
 type TFunc = (key: any, params?: Record<string, string>) => string
@@ -16,12 +16,16 @@ export function ProviderConfigSection({ t, settings }: { t: TFunc; settings: Set
         <h2 className="text-base font-semibold text-text mb-1">{t('integration.llmProviderConfig')}</h2>
         <p className="text-xs text-muted mb-4">{t('integration.llmProviderConfigDesc')}</p>
         <div className="space-y-3">
-          {LLM_API_PROVIDERS.map(provider => (
+          {LLM_API_PROVIDERS.filter(p => p !== 'deepseek' && p !== 'mimo' && p !== 'anthropic').map(provider => (
             <ApiProviderCard key={provider} provider={provider} t={t} />
           ))}
+          <AnthropicCard t={t} />
+          <DeepSeekCard t={t} />
+          <MimoCard t={t} />
           <ClaudeCodeCard t={t} />
           <OllamaCard t={t} />
           <VllmCard t={t} />
+          <CustomCard t={t} />
         </div>
       </div>
       <div>

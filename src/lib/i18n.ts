@@ -688,6 +688,53 @@ const dict = {
   'provider.vllm': { ja: 'vLLM', en: 'vLLM' },
   'provider.googleTranslate': { ja: 'Google Translate', en: 'Google Translate' },
   'provider.deepl': { ja: 'DeepL', en: 'DeepL' },
+  'provider.deepseek': { ja: 'DeepSeek API', en: 'DeepSeek API' },
+  'provider.mimo': { ja: 'Mimo API', en: 'Mimo API' },
+  'provider.custom': { ja: 'カスタム API', en: 'Custom API' },
+
+  // DeepSeek
+  'deepseek.apiKey': { ja: 'DeepSeek API キー', en: 'DeepSeek API Key' },
+  'deepseek.apiKeySaved': { ja: 'DeepSeek API キーを保存しました', en: 'DeepSeek API key saved' },
+  'deepseek.apiKeyDeleted': { ja: 'DeepSeek API キーを削除しました', en: 'DeepSeek API key deleted' },
+  'deepseek.testConnection': { ja: '接続テスト', en: 'Test Connection' },
+  'deepseek.testing': { ja: 'テスト中...', en: 'Testing...' },
+  'deepseek.connected': { ja: '接続成功', en: 'Connected' },
+  'deepseek.connectionFailed': { ja: '接続失敗', en: 'Connection failed' },
+  'deepseek.noModels': { ja: 'DeepSeek に接続できません', en: 'Cannot connect to DeepSeek' },
+
+  // Mimo
+  'mimo.apiKey': { ja: 'Mimo API キー', en: 'Mimo API Key' },
+  'mimo.apiKeySaved': { ja: 'Mimo API キーを保存しました', en: 'Mimo API key saved' },
+  'mimo.apiKeyDeleted': { ja: 'Mimo API キーを削除しました', en: 'Mimo API key deleted' },
+  'mimo.testConnection': { ja: '接続テスト', en: 'Test Connection' },
+  'mimo.testing': { ja: 'テスト中...', en: 'Testing...' },
+  'mimo.connected': { ja: '接続成功', en: 'Connected' },
+  'mimo.connectionFailed': { ja: '接続失敗', en: 'Connection failed' },
+  'mimo.noModels': { ja: 'Mimo に接続できません', en: 'Cannot connect to Mimo' },
+
+  // Custom API
+  'custom.baseUrl': { ja: 'カスタム API サーバー URL', en: 'Custom API Server URL' },
+  'custom.baseUrlDesc': { ja: 'カスタム API サーバーのアドレスを設定', en: 'Set the custom API server address' },
+  'custom.baseUrlPlaceholder': { ja: 'http://localhost:8000', en: 'http://localhost:8000' },
+  'custom.baseUrlSaved': { ja: 'カスタム API サーバー URL を保存しました', en: 'Custom API server URL saved' },
+  'custom.apiKey': { ja: 'API キー（任意）', en: 'API Key (optional)' },
+  'custom.apiKeySaved': { ja: 'カスタム API キーを保存しました', en: 'Custom API key saved' },
+  'custom.apiKeyDeleted': { ja: 'カスタム API キーを削除しました', en: 'Custom API key deleted' },
+  'custom.displayName': { ja: '表示名', en: 'Display Name' },
+  'custom.displayNameDesc': { ja: 'プロバイダーの表示名をカスタマイズ', en: 'Custom display name for this provider' },
+  'custom.displayNamePlaceholder': { ja: 'My Custom API', en: 'My Custom API' },
+  'custom.testConnection': { ja: '接続テスト', en: 'Test Connection' },
+  'custom.testing': { ja: 'テスト中...', en: 'Testing...' },
+  'custom.connected': { ja: '接続成功', en: 'Connected' },
+  'custom.connectionFailed': { ja: '接続失敗', en: 'Connection failed' },
+  'custom.noModels': { ja: 'カスタム API に接続できません', en: 'Cannot connect to Custom API' },
+
+  // Anthropic Advanced (base URL override)
+  'anthropic.baseUrl': { ja: 'Anthropic API ベース URL（任意）', en: 'Anthropic API Base URL (optional)' },
+  'anthropic.baseUrlDesc': { ja: 'デフォルトの Anthropic API エンドポイントを上書き（プロキシ用）', en: 'Override the default Anthropic API endpoint (for proxies)' },
+  'anthropic.baseUrlPlaceholder': { ja: 'https://api.anthropic.com', en: 'https://api.anthropic.com' },
+  'anthropic.baseUrlSaved': { ja: 'Anthropic ベース URL を保存しました', en: 'Anthropic base URL saved' },
+  'anthropic.advanced': { ja: '詳細設定', en: 'Advanced' },
   'ollama.baseUrl': { ja: 'Ollama サーバー URL', en: 'Ollama Server URL' },
   'ollama.baseUrlDesc': { ja: 'Ollama サーバーのアドレスを設定', en: 'Set the Ollama server address' },
   'ollama.baseUrlPlaceholder': { ja: 'http://localhost:11434', en: 'http://localhost:11434' },
@@ -770,6 +817,18 @@ const dict = {
     ja: 'DeepL API キーが設定されていません。',
     en: 'DeepL API key is not configured.',
   },
+  'error.deepseekKeyNotSet': {
+    ja: 'DeepSeek API キーが設定されていません。',
+    en: 'DeepSeek API key is not configured.',
+  },
+  'error.mimoKeyNotSet': {
+    ja: 'Mimo API キーが設定されていません。',
+    en: 'Mimo API key is not configured.',
+  },
+  'error.customBaseUrlNotSet': {
+    ja: 'カスタム API のベース URL が設定されていません。',
+    en: 'Custom API base URL is not configured.',
+  },
   'error.summarizationFailed': {
     ja: '要約に失敗しました。しばらくしてから再度お試しください。',
     en: 'Summarization failed. Please try again later.',
@@ -824,6 +883,9 @@ const errorCodeMap: Record<string, MessageKey> = {
   OPENAI_KEY_NOT_SET: 'error.openaiKeyNotSet',
   GOOGLE_TRANSLATE_KEY_NOT_SET: 'error.googleTranslateKeyNotSet',
   DEEPL_KEY_NOT_SET: 'error.deeplKeyNotSet',
+  DEEPSEEK_KEY_NOT_SET: 'error.deepseekKeyNotSet',
+  MIMO_KEY_NOT_SET: 'error.mimoKeyNotSet',
+  CUSTOM_BASE_URL_NOT_SET: 'error.customBaseUrlNotSet',
   SUMMARIZATION_FAILED: 'error.summarizationFailed',
   TRANSLATION_FAILED: 'error.translationFailed',
 }

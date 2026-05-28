@@ -5,13 +5,19 @@ import type { LLMProvider, LLMMessageParams, LLMStreamResult } from './provider.
 // --- Cached client (moved from server/anthropic.ts) ---
 
 let cachedKey = ''
+let cachedBaseUrl = ''
 let cachedClient: Anthropic | null = null
 
 export function getAnthropicClient(): Anthropic {
   const key = getSetting('api_key.anthropic') || ''
-  if (cachedClient && key === cachedKey) return cachedClient
+  const baseUrl = getSetting('anthropic.base_url') || ''
+  if (cachedClient && key === cachedKey && baseUrl === cachedBaseUrl) return cachedClient
   cachedKey = key
-  cachedClient = new Anthropic({ apiKey: key })
+  cachedBaseUrl = baseUrl
+  cachedClient = new Anthropic({
+    apiKey: key,
+    ...(baseUrl ? { baseURL: baseUrl.replace(/\/+$/, '') } : {}),
+  })
   return cachedClient
 }
 

@@ -5,6 +5,9 @@ import { openaiProvider } from './openai.js'
 import { claudeCodeProvider } from './claude-code.js'
 import { ollamaProvider } from './ollama.js'
 import { vllmProvider } from './vllm.js'
+import { deepseekProvider } from './deepseek.js'
+import { mimoProvider } from './mimo.js'
+import { customProvider } from './custom.js'
 
 const providers = new Map<string, LLMProvider>()
 
@@ -14,6 +17,9 @@ providers.set('openai', openaiProvider)
 providers.set('claude-code', claudeCodeProvider)
 providers.set('ollama', ollamaProvider)
 providers.set('vllm', vllmProvider)
+providers.set('deepseek', deepseekProvider)
+providers.set('mimo', mimoProvider)
+providers.set('custom', customProvider)
 
 export function getProvider(name: string): LLMProvider {
   const provider = providers.get(name)
