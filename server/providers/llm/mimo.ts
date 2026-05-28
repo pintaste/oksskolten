@@ -3,18 +3,25 @@ import { getSetting } from '../../db.js'
 import type { LLMProvider, LLMMessageParams, LLMStreamResult } from './provider.js'
 
 let cachedApiKey = ''
+let cachedBaseUrl = ''
 let cachedClient: OpenAI | null = null
 
 export function getMimoApiKey(): string {
   return getSetting('api_key.mimo') || ''
 }
 
+export function getMimoBaseUrl(): string {
+  return getSetting('mimo.base_url') || 'https://api.mimo.ai/v1'
+}
+
 export function getMimoClient(): OpenAI {
   const apiKey = getMimoApiKey()
-  if (cachedClient && apiKey === cachedApiKey) return cachedClient
+  const baseUrl = getMimoBaseUrl()
+  if (cachedClient && apiKey === cachedApiKey && baseUrl === cachedBaseUrl) return cachedClient
   cachedApiKey = apiKey
+  cachedBaseUrl = baseUrl
   cachedClient = new OpenAI({
-    baseURL: 'https://api.mimo.ai/v1',
+    baseURL: baseUrl,
     apiKey,
   })
   return cachedClient

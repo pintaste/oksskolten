@@ -3,13 +3,20 @@ import { getSetting } from '../../db.js'
 import type { LLMProvider, LLMMessageParams, LLMStreamResult } from './provider.js'
 
 let cachedKey = ''
+let cachedBaseUrl = ''
 let cachedClient: GoogleGenAI | null = null
+
+export function getGeminiBaseUrl(): string {
+  return getSetting('gemini.base_url') || ''
+}
 
 export function getGeminiClient(): GoogleGenAI {
   const key = getSetting('api_key.gemini') || ''
-  if (cachedClient && key === cachedKey) return cachedClient
+  const baseUrl = getGeminiBaseUrl()
+  if (cachedClient && key === cachedKey && baseUrl === cachedBaseUrl) return cachedClient
   cachedKey = key
-  cachedClient = new GoogleGenAI({ apiKey: key })
+  cachedBaseUrl = baseUrl
+  cachedClient = new GoogleGenAI({ apiKey: key, ...(baseUrl ? { httpOptions: { baseUrl } } : {}) })
   return cachedClient
 }
 

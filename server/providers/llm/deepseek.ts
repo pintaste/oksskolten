@@ -3,18 +3,25 @@ import { getSetting } from '../../db.js'
 import type { LLMProvider, LLMMessageParams, LLMStreamResult } from './provider.js'
 
 let cachedApiKey = ''
+let cachedBaseUrl = ''
 let cachedClient: OpenAI | null = null
 
 export function getDeepSeekApiKey(): string {
   return getSetting('api_key.deepseek') || ''
 }
 
+export function getDeepSeekBaseUrl(): string {
+  return getSetting('deepseek.base_url') || 'https://api.deepseek.com/v1'
+}
+
 export function getDeepSeekClient(): OpenAI {
   const apiKey = getDeepSeekApiKey()
-  if (cachedClient && apiKey === cachedApiKey) return cachedClient
+  const baseUrl = getDeepSeekBaseUrl()
+  if (cachedClient && apiKey === cachedApiKey && baseUrl === cachedBaseUrl) return cachedClient
   cachedApiKey = apiKey
+  cachedBaseUrl = baseUrl
   cachedClient = new OpenAI({
-    baseURL: 'https://api.deepseek.com/v1',
+    baseURL: baseUrl,
     apiKey,
   })
   return cachedClient

@@ -56,6 +56,13 @@ const PREF_KEYS = [
   'retention.enabled',
   'retention.read_days',
   'retention.unread_days',
+  'custom.base_url',
+  'custom.name',
+  'anthropic.base_url',
+  'deepseek.base_url',
+  'mimo.base_url',
+  'openai.base_url',
+  'gemini.base_url',
 ] as const
 type PrefKey = typeof PREF_KEYS[number]
 
@@ -90,6 +97,13 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'retention.enabled': ['on', 'off'],
   'retention.read_days': null,
   'retention.unread_days': null,
+  'custom.base_url': null,
+  'custom.name': null,
+  'anthropic.base_url': null,
+  'deepseek.base_url': null,
+  'mimo.base_url': null,
+  'openai.base_url': null,
+  'gemini.base_url': null,
 }
 
 const PROVIDER_MODEL_PAIRS: Array<{ providerKey: PrefKey; modelKey: PrefKey }> = [
@@ -561,6 +575,9 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     vllm: 'api_key.vllm',
     'google-translate': 'api_key.google_translate',
     deepl: 'api_key.deepl',
+    deepseek: 'api_key.deepseek',
+    mimo: 'api_key.mimo',
+    custom: 'api_key.custom',
   }
 
   api.get('/api/settings/api-keys/:provider', async (request, reply) => {
@@ -700,11 +717,12 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
   // --- DeepSeek endpoints ---
 
   async function deepseekFetch(path: string): Promise<Response> {
-    const { getDeepSeekApiKey } = await import('../providers/llm/deepseek.js')
+    const { getDeepSeekApiKey, getDeepSeekBaseUrl } = await import('../providers/llm/deepseek.js')
     const apiKey = getDeepSeekApiKey()
+    const baseUrl = getDeepSeekBaseUrl().replace(/\/+$/, '').replace(/\/v1$/, '')
     const headers: Record<string, string> = {}
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
-    return fetch(`https://api.deepseek.com${path}`, { headers, signal: AbortSignal.timeout(10_000) })
+    return fetch(`${baseUrl}${path}`, { headers, signal: AbortSignal.timeout(10_000) })
   }
 
   api.get('/api/settings/deepseek/models', async (_request, reply) => {
@@ -740,11 +758,12 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
   // --- Mimo endpoints ---
 
   async function mimoFetch(path: string): Promise<Response> {
-    const { getMimoApiKey } = await import('../providers/llm/mimo.js')
+    const { getMimoApiKey, getMimoBaseUrl } = await import('../providers/llm/mimo.js')
     const apiKey = getMimoApiKey()
+    const baseUrl = getMimoBaseUrl().replace(/\/+$/, '').replace(/\/v1$/, '')
     const headers: Record<string, string> = {}
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
-    return fetch(`https://api.mimo.ai${path}`, { headers, signal: AbortSignal.timeout(10_000) })
+    return fetch(`${baseUrl}${path}`, { headers, signal: AbortSignal.timeout(10_000) })
   }
 
   api.get('/api/settings/mimo/models', async (_request, reply) => {
@@ -817,5 +836,75 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
       const message = err instanceof Error ? err.message : 'Connection failed'
       reply.send({ ok: false, error: message })
     }
+  })
+
+  // --- Anthropic status endpoint ---
+
+  api.get('/api/settings/anthropic/status', async (_request, reply) => {
+    const key = getSetting('api_key.anthropic')
+    if (!key) {
+      reply.send({ ok: false, error: 'API key not configured' })
+      return
+    }
+    reply.send({ ok: true })
+  })
+
+  // --- OpenAI status endpoint ---
+
+  async function openaiFetch(path: string): Promise<Response> {
+    const { getOpenAIBaseUrl } = await import('../providers/llm/openai.js')
+    const apiKey = getSetting('api_key.openai') || ''
+    const baseUrl = getOpenAIBaseUrl().replace(/\/+$/, '').replace(/\/v1$/, '')
+    const headers: Record<string, string> = {}
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`
+    return fetch(`${baseUrl}${path}`, { headers, signal: AbortSignal.timeout(10_000) })
+  }
+
+  api.get('/api/settings/openai/status', async (_request, reply) => {
+    try {
+      const res = await openaiFetch('/v1/models')
+      if (!res.ok) {
+        reply.send({ ok: false, error: `HTTP ${res.status}` })
+        return
+      }
+      const data = await res.json() as { data?: unknown[] }
+      reply.send({ ok: true, model_count: data.data?.length || 0 })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Connection failed'
+      reply.send({ ok: false, error: message })
+    }
+  })
+
+  // --- Gemini status endpoint ---
+
+  api.get('/api/settings/gemini/status', async (_request, reply) => {
+    const key = getSetting('api_key.gemini')
+    if (!key) {
+      reply.send({ ok: false, error: 'API key not configured' })
+      return
+    }
+    reply.send({ ok: true })
+  })
+
+  // --- Google Translate status endpoint ---
+
+  api.get('/api/settings/google-translate/status', async (_request, reply) => {
+    const key = getSetting('api_key.google_translate')
+    if (!key) {
+      reply.send({ ok: false, error: 'API key not configured' })
+      return
+    }
+    reply.send({ ok: true })
+  })
+
+  // --- DeepL status endpoint ---
+
+  api.get('/api/settings/deepl/status', async (_request, reply) => {
+    const key = getSetting('api_key.deepl')
+    if (!key) {
+      reply.send({ ok: false, error: 'API key not configured' })
+      return
+    }
+    reply.send({ ok: true })
   })
 }

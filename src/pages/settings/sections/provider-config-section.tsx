@@ -71,10 +71,30 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
     fetcher,
     { revalidateOnFocus: false },
   )
+  const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
+    '/api/settings/preferences',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const isLlmProvider = (LLM_API_PROVIDERS as readonly string[]).includes(provider)
+  const savedBaseUrl = prefs?.[`${provider}.base_url`] || ''
+  const isConfigured = keyStatus?.configured
 
   const [apiKeyInput, setApiKeyInput] = useState('')
+  const [baseUrlInput, setBaseUrlInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; error?: string } | null>(null)
+
+  const [initialized, setInitialized] = useState(false)
+  useEffect(() => {
+    if (!prefs || initialized) return
+    setBaseUrlInput(prefs[`${provider}.base_url`] || '')
+    setInitialized(true)
+  }, [prefs, initialized, provider])
 
   function showMessage(text: string, type: 'success' | 'error') {
     setMessage({ text, type })
@@ -102,8 +122,16 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
     if (saving) return
     setSaving(true)
     try {
-      await apiPost(endpoint, { apiKey: apiKeyInput })
+      const promises: Promise<any>[] = []
+      if (apiKeyInput) {
+        promises.push(apiPost(endpoint, { apiKey: apiKeyInput }))
+      }
+      if (isLlmProvider && baseUrlInput !== savedBaseUrl) {
+        promises.push(apiPatch('/api/settings/preferences', { [`${provider}.base_url`]: baseUrlInput || '' }))
+      }
+      await Promise.all(promises)
       void mutateKeyStatus()
+      void mutatePrefs()
       setApiKeyInput('')
       showMessage(savedMsg, 'success')
     } catch (err: unknown) {
@@ -128,7 +156,21 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
     }
   }
 
-  const isConfigured = keyStatus?.configured
+  const handleTest = useCallback(async () => {
+    if (testing) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetcher(`/api/settings/${provider}/status`) as { ok: boolean; model_count?: number; error?: string }
+      setTestResult(res)
+    } catch {
+      setTestResult({ ok: false, error: 'Request failed' })
+    } finally {
+      setTesting(false)
+    }
+  }, [testing, provider])
+
+  const hasChanges = !!apiKeyInput || (isLlmProvider && baseUrlInput !== savedBaseUrl)
 
   return (
     <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
@@ -162,18 +204,80 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
             placeholder={placeholder}
             className="flex-1 py-1.5"
           />
-          {apiKeyInput && (
+          </div>
+        </FormField>
+      )}
+
+      {isConfigured && (
+        <FormField label={t('chat.apiKey')} compact>
+          <div className="flex items-center gap-2">
+          <Input
+            type="password"
+            value={apiKeyInput}
+            onChange={e => setApiKeyInput(e.target.value)}
+            placeholder="••••••••"
+            className="flex-1 py-1.5"
+          />
+          </div>
+        </FormField>
+      )}
+
+      {isLlmProvider && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen(!advancedOpen)}
+            className="flex items-center gap-1 text-[11px] text-muted hover:text-text transition-colors select-none"
+          >
+            <ChevronDown size={12} className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
+            {t('anthropic.advanced')}
+          </button>
+          {advancedOpen && (
+            <div className="mt-1.5">
+              <FormField label={t('anthropic.baseUrl')} hint={t('anthropic.baseUrlDesc')} compact>
+                <Input
+                  type="text"
+                  value={baseUrlInput}
+                  onChange={e => setBaseUrlInput(e.target.value)}
+                  placeholder={t('anthropic.baseUrlPlaceholder')}
+                  className="py-1.5"
+                />
+              </FormField>
+            </div>
+          )}
+        </div>
+      )}
+
+      {(hasChanges || isConfigured) && (
+        <div className="flex items-center gap-2">
+          {hasChanges && (
             <button
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none"
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
             >
               {saving ? '...' : t('settings.save')}
             </button>
           )}
-          </div>
-        </FormField>
+          {isConfigured && (
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={testing}
+              className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+            >
+              {testing ? t('ollama.testing') : t('ollama.testConnection')}
+            </button>
+          )}
+          {testResult && (
+            <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
+              {testResult.ok
+                ? t('ollama.connected')
+                : `${t('ollama.connectionFailed')}: ${testResult.error}`}
+            </span>
+          )}
+        </div>
       )}
 
       {message && (
@@ -617,12 +721,29 @@ function DeepSeekCard({ t }: { t: TFunc }) {
     fetcher,
     { revalidateOnFocus: false },
   )
+  const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
+    '/api/settings/preferences',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const savedBaseUrl = prefs?.['deepseek.base_url'] || ''
+  const isConfigured = keyStatus?.configured
 
   const [apiKeyInput, setApiKeyInput] = useState('')
+  const [baseUrlInput, setBaseUrlInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; error?: string } | null>(null)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+
+  const [initialized, setInitialized] = useState(false)
+  useEffect(() => {
+    if (!prefs || initialized) return
+    setBaseUrlInput(prefs['deepseek.base_url'] || '')
+    setInitialized(true)
+  }, [prefs, initialized])
 
   function showMessage(text: string, type: 'success' | 'error') {
     setMessage({ text, type })
@@ -633,8 +754,16 @@ function DeepSeekCard({ t }: { t: TFunc }) {
     if (saving) return
     setSaving(true)
     try {
-      await apiPost('/api/settings/api-keys/deepseek', { apiKey: apiKeyInput })
+      const promises: Promise<any>[] = []
+      if (apiKeyInput) {
+        promises.push(apiPost('/api/settings/api-keys/deepseek', { apiKey: apiKeyInput }))
+      }
+      if (baseUrlInput !== savedBaseUrl) {
+        promises.push(apiPatch('/api/settings/preferences', { 'deepseek.base_url': baseUrlInput || '' }))
+      }
+      await Promise.all(promises)
       void mutateKeyStatus()
+      void mutatePrefs()
       setApiKeyInput('')
       showMessage(t('deepseek.apiKeySaved'), 'success')
     } catch (err: unknown) {
@@ -673,7 +802,7 @@ function DeepSeekCard({ t }: { t: TFunc }) {
     }
   }, [testing])
 
-  const isConfigured = keyStatus?.configured
+  const hasChanges = !!apiKeyInput || baseUrlInput !== savedBaseUrl
 
   return (
     <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
@@ -707,30 +836,70 @@ function DeepSeekCard({ t }: { t: TFunc }) {
             placeholder="sk-..."
             className="flex-1 py-1.5"
           />
-          {apiKeyInput && (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none"
-            >
-              {saving ? '...' : t('settings.save')}
-            </button>
-          )}
           </div>
         </FormField>
       )}
 
       {isConfigured && (
+        <FormField label={t('chat.apiKey')} compact>
+          <div className="flex items-center gap-2">
+          <Input
+            type="password"
+            value={apiKeyInput}
+            onChange={e => setApiKeyInput(e.target.value)}
+            placeholder="••••••••"
+            className="flex-1 py-1.5"
+          />
+          </div>
+        </FormField>
+      )}
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen(!advancedOpen)}
+          className="flex items-center gap-1 text-[11px] text-muted hover:text-text transition-colors select-none"
+        >
+          <ChevronDown size={12} className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
+          {t('anthropic.advanced')}
+        </button>
+        {advancedOpen && (
+          <div className="mt-1.5">
+            <FormField label={t('anthropic.baseUrl')} hint={t('anthropic.baseUrlDesc')} compact>
+              <Input
+                type="text"
+                value={baseUrlInput}
+                onChange={e => setBaseUrlInput(e.target.value)}
+                placeholder={t('anthropic.baseUrlPlaceholder')}
+                className="py-1.5"
+              />
+            </FormField>
+          </div>
+        )}
+      </div>
+
+      {(hasChanges || isConfigured) && (
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleTest}
-            disabled={testing}
-            className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-          >
-            {testing ? t('deepseek.testing') : t('deepseek.testConnection')}
-          </button>
+          {hasChanges && (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
+            >
+              {saving ? '...' : t('settings.save')}
+            </button>
+          )}
+          {isConfigured && (
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={testing}
+              className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+            >
+              {testing ? t('deepseek.testing') : t('deepseek.testConnection')}
+            </button>
+          )}
           {testResult && (
             <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
               {testResult.ok
@@ -756,12 +925,29 @@ function MimoCard({ t }: { t: TFunc }) {
     fetcher,
     { revalidateOnFocus: false },
   )
+  const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
+    '/api/settings/preferences',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const savedBaseUrl = prefs?.['mimo.base_url'] || ''
+  const isConfigured = keyStatus?.configured
 
   const [apiKeyInput, setApiKeyInput] = useState('')
+  const [baseUrlInput, setBaseUrlInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; error?: string } | null>(null)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+
+  const [initialized, setInitialized] = useState(false)
+  useEffect(() => {
+    if (!prefs || initialized) return
+    setBaseUrlInput(prefs['mimo.base_url'] || '')
+    setInitialized(true)
+  }, [prefs, initialized])
 
   function showMessage(text: string, type: 'success' | 'error') {
     setMessage({ text, type })
@@ -772,8 +958,16 @@ function MimoCard({ t }: { t: TFunc }) {
     if (saving) return
     setSaving(true)
     try {
-      await apiPost('/api/settings/api-keys/mimo', { apiKey: apiKeyInput })
+      const promises: Promise<any>[] = []
+      if (apiKeyInput) {
+        promises.push(apiPost('/api/settings/api-keys/mimo', { apiKey: apiKeyInput }))
+      }
+      if (baseUrlInput !== savedBaseUrl) {
+        promises.push(apiPatch('/api/settings/preferences', { 'mimo.base_url': baseUrlInput || '' }))
+      }
+      await Promise.all(promises)
       void mutateKeyStatus()
+      void mutatePrefs()
       setApiKeyInput('')
       showMessage(t('mimo.apiKeySaved'), 'success')
     } catch (err: unknown) {
@@ -812,7 +1006,7 @@ function MimoCard({ t }: { t: TFunc }) {
     }
   }, [testing])
 
-  const isConfigured = keyStatus?.configured
+  const hasChanges = !!apiKeyInput || baseUrlInput !== savedBaseUrl
 
   return (
     <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
@@ -846,30 +1040,70 @@ function MimoCard({ t }: { t: TFunc }) {
             placeholder="..."
             className="flex-1 py-1.5"
           />
-          {apiKeyInput && (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none"
-            >
-              {saving ? '...' : t('settings.save')}
-            </button>
-          )}
           </div>
         </FormField>
       )}
 
       {isConfigured && (
+        <FormField label={t('chat.apiKey')} compact>
+          <div className="flex items-center gap-2">
+          <Input
+            type="password"
+            value={apiKeyInput}
+            onChange={e => setApiKeyInput(e.target.value)}
+            placeholder="••••••••"
+            className="flex-1 py-1.5"
+          />
+          </div>
+        </FormField>
+      )}
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen(!advancedOpen)}
+          className="flex items-center gap-1 text-[11px] text-muted hover:text-text transition-colors select-none"
+        >
+          <ChevronDown size={12} className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
+          {t('anthropic.advanced')}
+        </button>
+        {advancedOpen && (
+          <div className="mt-1.5">
+            <FormField label={t('anthropic.baseUrl')} hint={t('anthropic.baseUrlDesc')} compact>
+              <Input
+                type="text"
+                value={baseUrlInput}
+                onChange={e => setBaseUrlInput(e.target.value)}
+                placeholder={t('anthropic.baseUrlPlaceholder')}
+                className="py-1.5"
+              />
+            </FormField>
+          </div>
+        )}
+      </div>
+
+      {(hasChanges || isConfigured) && (
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleTest}
-            disabled={testing}
-            className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-          >
-            {testing ? t('mimo.testing') : t('mimo.testConnection')}
-          </button>
+          {hasChanges && (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
+            >
+              {saving ? '...' : t('settings.save')}
+            </button>
+          )}
+          {isConfigured && (
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={testing}
+              className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+            >
+              {testing ? t('mimo.testing') : t('mimo.testConnection')}
+            </button>
+          )}
           {testResult && (
             <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
               {testResult.ok
