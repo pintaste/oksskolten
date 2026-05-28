@@ -5,6 +5,7 @@ import {
   ANTHROPIC_MODELS,
   GEMINI_MODELS,
   OPENAI_MODELS,
+  DEEPSEEK_MODELS,
   DEFAULT_MODELS,
   PROVIDER_LABELS,
   LLM_API_PROVIDERS,
@@ -36,13 +37,16 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
   const anthropicKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/anthropic`, fetcher, SWR_KEY_OPTS)
   const geminiKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/gemini`, fetcher, SWR_KEY_OPTS)
   const openaiKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/openai`, fetcher, SWR_KEY_OPTS)
+  const deepseekKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/deepseek`, fetcher, SWR_KEY_OPTS)
+  const mimoKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/mimo`, fetcher, SWR_KEY_OPTS)
+  const customKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/custom`, fetcher, SWR_KEY_OPTS)
   const googleTranslateKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/google-translate`, fetcher, SWR_KEY_OPTS)
   const deeplKey = useSWR<{ configured: boolean }>(`/api/settings/api-keys/deepl`, fetcher, SWR_KEY_OPTS)
   const { data: claudeCodeStatus } = useSWR<{ loggedIn?: boolean; error?: string }>(
     '/api/chat/claude-code-status', fetcher, SWR_KEY_OPTS,
   )
 
-  const llmKeyStatuses = [anthropicKey, geminiKey, openaiKey]
+  const llmKeyStatuses = [anthropicKey, geminiKey, openaiKey, deepseekKey, mimoKey]
   const translateKeyStatuses = [googleTranslateKey, deeplKey]
 
   const claudeCodeReady = !!claudeCodeStatus?.loggedIn
@@ -53,11 +57,13 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
     map['claude-code'] = claudeCodeReady
     map['ollama'] = true  // Ollama requires no API key; always available
     map['vllm'] = true    // vLLM requires no API key by default; always available
+    map['custom'] = !!customKey.data?.configured
     return map
     // Recompute only when any key's configured status changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     anthropicKey.data?.configured, geminiKey.data?.configured, openaiKey.data?.configured,
+    deepseekKey.data?.configured, mimoKey.data?.configured, customKey.data?.configured,
     googleTranslateKey.data?.configured, deeplKey.data?.configured, claudeCodeReady,
   ])
   // Ollama/vLLM requires no API key, so the task section is always enabled when they are available.
@@ -72,8 +78,8 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
       providerValue: settings.chatProvider || '',
       setProvider: (v) => {
         settings.setChatProvider(v)
-        // Ollama/vLLM models are dynamic; don't set a default (auto-selected by ModelSelect)
-        if (v !== 'ollama' && v !== 'vllm') settings.setChatModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
+        // Dynamic model providers: don't set a default (auto-selected by ModelSelect)
+        if (v !== 'ollama' && v !== 'vllm' && v !== 'mimo' && v !== 'custom') settings.setChatModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
         else settings.setChatModel('')
       },
       modelValue: settings.chatModel || '',
@@ -85,7 +91,7 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
       providerValue: settings.summaryProvider || '',
       setProvider: (v) => {
         settings.setSummaryProvider(v)
-        if (v !== 'ollama' && v !== 'vllm') settings.setSummaryModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
+        if (v !== 'ollama' && v !== 'vllm' && v !== 'mimo' && v !== 'custom') settings.setSummaryModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
         else settings.setSummaryModel('')
       },
       modelValue: settings.summaryModel || '',
@@ -97,7 +103,7 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
       providerValue: settings.translateProvider || '',
       setProvider: (v) => {
         settings.setTranslateProvider(v)
-        if (v !== 'ollama' && v !== 'vllm') settings.setTranslateModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
+        if (v !== 'ollama' && v !== 'vllm' && v !== 'mimo' && v !== 'custom') settings.setTranslateModel(DEFAULT_MODELS[v] || DEFAULT_MODELS.anthropic)
         else settings.setTranslateModel('')
       },
       modelValue: settings.translateModel || '',
@@ -265,6 +271,27 @@ function ModelSelect({ provider, modelValue, setModel, t }: { provider: string; 
     { revalidateOnFocus: false },
   )
 
+  // DeepSeek: fetch dynamic model list
+  const { data: deepseekModels } = useSWR<{ models: Array<{ name: string }> }>(
+    provider === 'deepseek' ? '/api/settings/deepseek/models' : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  // Mimo: fetch dynamic model list
+  const { data: mimoModels } = useSWR<{ models: Array<{ name: string }> }>(
+    provider === 'mimo' ? '/api/settings/mimo/models' : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  // Custom: fetch dynamic model list
+  const { data: customModels } = useSWR<{ models: Array<{ name: string }> }>(
+    provider === 'custom' ? '/api/settings/custom/models' : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
   // Auto-select first Ollama model when switching to ollama and no model is set
   useEffect(() => {
     if (provider === 'ollama' && ollamaModels?.models?.length && !modelValue) {
@@ -278,6 +305,27 @@ function ModelSelect({ provider, modelValue, setModel, t }: { provider: string; 
       setModel(vllmModels.models[0].name)
     }
   }, [provider, vllmModels, modelValue, setModel])
+
+  // Auto-select first DeepSeek model when switching to deepseek and no model is set
+  useEffect(() => {
+    if (provider === 'deepseek' && deepseekModels?.models?.length && !modelValue) {
+      setModel(deepseekModels.models[0].name)
+    }
+  }, [provider, deepseekModels, modelValue, setModel])
+
+  // Auto-select first Mimo model when switching to mimo and no model is set
+  useEffect(() => {
+    if (provider === 'mimo' && mimoModels?.models?.length && !modelValue) {
+      setModel(mimoModels.models[0].name)
+    }
+  }, [provider, mimoModels, modelValue, setModel])
+
+  // Auto-select first Custom model when switching to custom and no model is set
+  useEffect(() => {
+    if (provider === 'custom' && customModels?.models?.length && !modelValue) {
+      setModel(customModels.models[0].name)
+    }
+  }, [provider, customModels, modelValue, setModel])
 
   if (!provider) {
     return (
@@ -327,6 +375,106 @@ function ModelSelect({ provider, modelValue, setModel, t }: { provider: string; 
         <Select disabled>
           <SelectTrigger>
             <SelectValue placeholder={t('vllm.noModels')} />
+          </SelectTrigger>
+          <SelectContent />
+        </Select>
+      )
+    }
+    return (
+      <Select value={modelValue || undefined} onValueChange={setModel}>
+        <SelectTrigger>
+          <SelectValue placeholder={t('integration.selectModel')} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {models.map(m => (
+              <SelectItem key={m.name} value={m.name}>
+                {m.name}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    )
+  }
+
+  if (provider === 'deepseek') {
+    const models = deepseekModels?.models || []
+    if (models.length === 0) {
+      // Fallback to static DEEPSEEK_MODELS when no dynamic models
+      return (
+        <Select value={modelValue || undefined} onValueChange={setModel}>
+          <SelectTrigger>
+            <SelectValue placeholder={t('integration.selectModel')} />
+          </SelectTrigger>
+          <SelectContent>
+            {DEEPSEEK_MODELS.map(group => (
+              <SelectGroup key={group.group}>
+                <SelectLabel>{group.group}</SelectLabel>
+                {group.models.map(m => (
+                  <SelectItem key={m.value} value={m.value}>{m.label} ({m.value})</SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+      )
+    }
+    return (
+      <Select value={modelValue || undefined} onValueChange={setModel}>
+        <SelectTrigger>
+          <SelectValue placeholder={t('integration.selectModel')} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {models.map(m => (
+              <SelectItem key={m.name} value={m.name}>
+                {m.name}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    )
+  }
+
+  if (provider === 'mimo') {
+    const models = mimoModels?.models || []
+    if (models.length === 0) {
+      return (
+        <Select disabled>
+          <SelectTrigger>
+            <SelectValue placeholder={t('mimo.noModels')} />
+          </SelectTrigger>
+          <SelectContent />
+        </Select>
+      )
+    }
+    return (
+      <Select value={modelValue || undefined} onValueChange={setModel}>
+        <SelectTrigger>
+          <SelectValue placeholder={t('integration.selectModel')} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {models.map(m => (
+              <SelectItem key={m.name} value={m.name}>
+                {m.name}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    )
+  }
+
+  if (provider === 'custom') {
+    const models = customModels?.models || []
+    if (models.length === 0) {
+      return (
+        <Select disabled>
+          <SelectTrigger>
+            <SelectValue placeholder={t('custom.noModels')} />
           </SelectTrigger>
           <SelectContent />
         </Select>

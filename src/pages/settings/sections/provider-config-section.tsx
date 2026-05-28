@@ -610,3 +610,628 @@ function VllmCard({ t }: { t: TFunc }) {
     </div>
   )
 }
+
+function DeepSeekCard({ t }: { t: TFunc }) {
+  const { data: keyStatus, mutate: mutateKeyStatus } = useSWR<{ configured: boolean }>(
+    '/api/settings/api-keys/deepseek',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; error?: string } | null>(null)
+
+  function showMessage(text: string, type: 'success' | 'error') {
+    setMessage({ text, type })
+    setTimeout(() => setMessage(null), 3000)
+  }
+
+  async function handleSave() {
+    if (saving) return
+    setSaving(true)
+    try {
+      await apiPost('/api/settings/api-keys/deepseek', { apiKey: apiKeyInput })
+      void mutateKeyStatus()
+      setApiKeyInput('')
+      showMessage(t('deepseek.apiKeySaved'), 'success')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (saving) return
+    setSaving(true)
+    try {
+      await apiPost('/api/settings/api-keys/deepseek', { apiKey: '' })
+      void mutateKeyStatus()
+      setApiKeyInput('')
+      showMessage(t('deepseek.apiKeyDeleted'), 'success')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Delete failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTest = useCallback(async () => {
+    if (testing) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetcher('/api/settings/deepseek/status') as { ok: boolean; model_count?: number; error?: string }
+      setTestResult(res)
+    } catch {
+      setTestResult({ ok: false, error: 'Request failed' })
+    } finally {
+      setTesting(false)
+    }
+  }, [testing])
+
+  const isConfigured = keyStatus?.configured
+
+  return (
+    <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${isConfigured ? 'bg-success' : 'bg-error'}`} />
+          <span className="text-sm font-medium text-text select-none">{t(PROVIDER_LABELS['deepseek'])}</span>
+          <span className="text-xs text-muted select-none">
+            {isConfigured ? t('chat.apiKeyConfigured') : t('chat.apiKeyNotSet')}
+          </span>
+        </div>
+        {isConfigured && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={saving}
+            className="px-3 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+          >
+            {t('chat.apiKeyDelete')}
+          </button>
+        )}
+      </div>
+
+      {!isConfigured && (
+        <FormField label={t('chat.apiKey')} compact>
+          <div className="flex items-center gap-2">
+          <Input
+            type="password"
+            value={apiKeyInput}
+            onChange={e => setApiKeyInput(e.target.value)}
+            placeholder="sk-..."
+            className="flex-1 py-1.5"
+          />
+          {apiKeyInput && (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none"
+            >
+              {saving ? '...' : t('settings.save')}
+            </button>
+          )}
+          </div>
+        </FormField>
+      )}
+
+      {isConfigured && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleTest}
+            disabled={testing}
+            className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+          >
+            {testing ? t('deepseek.testing') : t('deepseek.testConnection')}
+          </button>
+          {testResult && (
+            <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
+              {testResult.ok
+                ? `${t('deepseek.connected')} (${testResult.model_count} models)`
+                : `${t('deepseek.connectionFailed')}: ${testResult.error}`}
+            </span>
+          )}
+        </div>
+      )}
+
+      {message && (
+        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
+          {message.text}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function MimoCard({ t }: { t: TFunc }) {
+  const { data: keyStatus, mutate: mutateKeyStatus } = useSWR<{ configured: boolean }>(
+    '/api/settings/api-keys/mimo',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; error?: string } | null>(null)
+
+  function showMessage(text: string, type: 'success' | 'error') {
+    setMessage({ text, type })
+    setTimeout(() => setMessage(null), 3000)
+  }
+
+  async function handleSave() {
+    if (saving) return
+    setSaving(true)
+    try {
+      await apiPost('/api/settings/api-keys/mimo', { apiKey: apiKeyInput })
+      void mutateKeyStatus()
+      setApiKeyInput('')
+      showMessage(t('mimo.apiKeySaved'), 'success')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (saving) return
+    setSaving(true)
+    try {
+      await apiPost('/api/settings/api-keys/mimo', { apiKey: '' })
+      void mutateKeyStatus()
+      setApiKeyInput('')
+      showMessage(t('mimo.apiKeyDeleted'), 'success')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Delete failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTest = useCallback(async () => {
+    if (testing) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetcher('/api/settings/mimo/status') as { ok: boolean; model_count?: number; error?: string }
+      setTestResult(res)
+    } catch {
+      setTestResult({ ok: false, error: 'Request failed' })
+    } finally {
+      setTesting(false)
+    }
+  }, [testing])
+
+  const isConfigured = keyStatus?.configured
+
+  return (
+    <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${isConfigured ? 'bg-success' : 'bg-error'}`} />
+          <span className="text-sm font-medium text-text select-none">{t(PROVIDER_LABELS['mimo'])}</span>
+          <span className="text-xs text-muted select-none">
+            {isConfigured ? t('chat.apiKeyConfigured') : t('chat.apiKeyNotSet')}
+          </span>
+        </div>
+        {isConfigured && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={saving}
+            className="px-3 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+          >
+            {t('chat.apiKeyDelete')}
+          </button>
+        )}
+      </div>
+
+      {!isConfigured && (
+        <FormField label={t('chat.apiKey')} compact>
+          <div className="flex items-center gap-2">
+          <Input
+            type="password"
+            value={apiKeyInput}
+            onChange={e => setApiKeyInput(e.target.value)}
+            placeholder="..."
+            className="flex-1 py-1.5"
+          />
+          {apiKeyInput && (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none"
+            >
+              {saving ? '...' : t('settings.save')}
+            </button>
+          )}
+          </div>
+        </FormField>
+      )}
+
+      {isConfigured && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleTest}
+            disabled={testing}
+            className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+          >
+            {testing ? t('mimo.testing') : t('mimo.testConnection')}
+          </button>
+          {testResult && (
+            <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
+              {testResult.ok
+                ? `${t('mimo.connected')} (${testResult.model_count} models)`
+                : `${t('mimo.connectionFailed')}: ${testResult.error}`}
+            </span>
+          )}
+        </div>
+      )}
+
+      {message && (
+        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
+          {message.text}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function CustomCard({ t }: { t: TFunc }) {
+  const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
+    '/api/settings/preferences',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+  const { data: keyStatus, mutate: mutateKeyStatus } = useSWR<{ configured: boolean }>(
+    '/api/settings/api-keys/custom',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const savedBaseUrl = prefs?.['custom.base_url'] || ''
+  const savedName = prefs?.['custom.name'] || ''
+  const isConfigured = keyStatus?.configured
+
+  const [baseUrlInput, setBaseUrlInput] = useState('')
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [nameInput, setNameInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; error?: string } | null>(null)
+
+  const [initialized, setInitialized] = useState(false)
+  useEffect(() => {
+    if (!prefs || initialized) return
+    setBaseUrlInput(prefs['custom.base_url'] || '')
+    setNameInput(prefs['custom.name'] || '')
+    setInitialized(true)
+  }, [prefs, initialized])
+
+  function showMessage(text: string, type: 'success' | 'error') {
+    setMessage({ text, type })
+    setTimeout(() => setMessage(null), 3000)
+  }
+
+  const handleSave = useCallback(async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      const promises: Promise<any>[] = [
+        apiPatch('/api/settings/preferences', {
+          'custom.base_url': baseUrlInput || '',
+          'custom.name': nameInput || '',
+        }),
+      ]
+      if (apiKeyInput) {
+        promises.push(apiPost('/api/settings/api-keys/custom', { apiKey: apiKeyInput }))
+      }
+      await Promise.all(promises)
+      void mutatePrefs()
+      void mutateKeyStatus()
+      setApiKeyInput('')
+      showMessage(t('custom.settingsSaved'), 'success')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }, [saving, baseUrlInput, apiKeyInput, nameInput, mutatePrefs, mutateKeyStatus, t])
+
+  const handleDeleteKey = useCallback(async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      await apiPost('/api/settings/api-keys/custom', { apiKey: '' })
+      void mutateKeyStatus()
+      showMessage(t('custom.apiKeyDeleted'), 'success')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Delete failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }, [saving, mutateKeyStatus, t])
+
+  const handleTest = useCallback(async () => {
+    if (testing) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetcher('/api/settings/custom/status') as { ok: boolean; model_count?: number; error?: string }
+      setTestResult(res)
+    } catch {
+      setTestResult({ ok: false, error: 'Request failed' })
+    } finally {
+      setTesting(false)
+    }
+  }, [testing])
+
+  const hasChanges = baseUrlInput !== savedBaseUrl || nameInput !== savedName || !!apiKeyInput
+
+  return (
+    <div className="p-3 rounded-lg bg-bg-card border border-border min-h-[3rem] space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${testResult?.ok ? 'bg-success' : savedBaseUrl ? 'bg-warning' : 'bg-muted'}`} />
+          <span className="text-sm font-medium text-text select-none">{t('provider.custom')}</span>
+        </div>
+        {isConfigured && (
+          <button
+            type="button"
+            onClick={handleDeleteKey}
+            disabled={saving}
+            className="px-3 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+          >
+            {t('chat.apiKeyDelete')}
+          </button>
+        )}
+      </div>
+
+      <FormField label={t('custom.baseUrl')} hint={t('custom.baseUrlDesc')} compact>
+        <Input
+          type="text"
+          value={baseUrlInput}
+          onChange={e => setBaseUrlInput(e.target.value)}
+          placeholder={t('custom.baseUrlPlaceholder')}
+          className="py-1.5"
+        />
+      </FormField>
+
+      <FormField label={t('custom.displayName')} hint={t('custom.displayNameDesc')} compact>
+        <Input
+          type="text"
+          value={nameInput}
+          onChange={e => setNameInput(e.target.value)}
+          placeholder={t('custom.displayNamePlaceholder')}
+          className="py-1.5"
+        />
+      </FormField>
+
+      <FormField label={t('chat.apiKey')} compact>
+        <Input
+          type="password"
+          value={apiKeyInput}
+          onChange={e => setApiKeyInput(e.target.value)}
+          placeholder={isConfigured ? '••••••••' : '...'}
+          className="py-1.5"
+        />
+      </FormField>
+
+      <div className="flex items-center gap-2">
+        {hasChanges && (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
+          >
+            {saving ? '...' : t('settings.save')}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleTest}
+          disabled={testing}
+          className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+        >
+          {testing ? t('custom.testing') : t('custom.testConnection')}
+        </button>
+        {testResult && (
+          <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
+            {testResult.ok
+              ? `${t('custom.connected')} (${testResult.model_count} models)`
+              : `${t('custom.connectionFailed')}: ${testResult.error}`}
+          </span>
+        )}
+      </div>
+
+      {message && (
+        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
+          {message.text}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function AnthropicCard({ t }: { t: TFunc }) {
+  const { data: keyStatus, mutate: mutateKeyStatus } = useSWR<{ configured: boolean }>(
+    '/api/settings/api-keys/anthropic',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+  const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
+    '/api/settings/preferences',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const savedBaseUrl = prefs?.['anthropic.base_url'] || ''
+  const isConfigured = keyStatus?.configured
+
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [baseUrlInput, setBaseUrlInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+
+  const [initialized, setInitialized] = useState(false)
+  useEffect(() => {
+    if (!prefs || initialized) return
+    setBaseUrlInput(prefs['anthropic.base_url'] || '')
+    setInitialized(true)
+  }, [prefs, initialized])
+
+  function showMessage(text: string, type: 'success' | 'error') {
+    setMessage({ text, type })
+    setTimeout(() => setMessage(null), 3000)
+  }
+
+  async function handleSave() {
+    if (saving) return
+    setSaving(true)
+    try {
+      const promises: Promise<any>[] = []
+      if (apiKeyInput) {
+        promises.push(apiPost('/api/settings/api-keys/anthropic', { apiKey: apiKeyInput }))
+      }
+      if (baseUrlInput !== savedBaseUrl) {
+        promises.push(apiPatch('/api/settings/preferences', { 'anthropic.base_url': baseUrlInput || '' }))
+      }
+      await Promise.all(promises)
+      void mutateKeyStatus()
+      void mutatePrefs()
+      setApiKeyInput('')
+      showMessage(t('anthropic.settingsSaved'), 'success')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (saving) return
+    setSaving(true)
+    try {
+      await apiPost('/api/settings/api-keys/anthropic', { apiKey: '' })
+      void mutateKeyStatus()
+      setApiKeyInput('')
+      showMessage(t('anthropic.apiKeyDeleted'), 'success')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Delete failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const hasChanges = !!apiKeyInput || baseUrlInput !== savedBaseUrl
+
+  return (
+    <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full shrink-0 ${isConfigured ? 'bg-success' : 'bg-error'}`} />
+          <span className="text-sm font-medium text-text select-none">{t(PROVIDER_LABELS['anthropic'])}</span>
+          <span className="text-xs text-muted select-none">
+            {isConfigured ? t('chat.apiKeyConfigured') : t('chat.apiKeyNotSet')}
+          </span>
+        </div>
+        {isConfigured && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={saving}
+            className="px-3 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+          >
+            {t('chat.apiKeyDelete')}
+          </button>
+        )}
+      </div>
+
+      {!isConfigured && (
+        <FormField label={t('chat.apiKey')} compact>
+          <div className="flex items-center gap-2">
+          <Input
+            type="password"
+            value={apiKeyInput}
+            onChange={e => setApiKeyInput(e.target.value)}
+            placeholder="sk-ant-..."
+            className="flex-1 py-1.5"
+          />
+          </div>
+        </FormField>
+      )}
+
+      {isConfigured && (
+        <FormField label={t('chat.apiKey')} compact>
+          <div className="flex items-center gap-2">
+          <Input
+            type="password"
+            value={apiKeyInput}
+            onChange={e => setApiKeyInput(e.target.value)}
+            placeholder="••••••••"
+            className="flex-1 py-1.5"
+          />
+          </div>
+        </FormField>
+      )}
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen(!advancedOpen)}
+          className="flex items-center gap-1 text-[11px] text-muted hover:text-text transition-colors select-none"
+        >
+          <ChevronDown size={12} className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
+          {t('anthropic.advanced')}
+        </button>
+        {advancedOpen && (
+          <div className="mt-1.5">
+            <FormField label={t('anthropic.baseUrl')} hint={t('anthropic.baseUrlDesc')} compact>
+              <Input
+                type="text"
+                value={baseUrlInput}
+                onChange={e => setBaseUrlInput(e.target.value)}
+                placeholder={t('anthropic.baseUrlPlaceholder')}
+                className="py-1.5"
+              />
+            </FormField>
+          </div>
+        )}
+      </div>
+
+      {hasChanges && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
+          >
+            {saving ? '...' : t('settings.save')}
+          </button>
+        </div>
+      )}
+
+      {message && (
+        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
+          {message.text}
+        </p>
+      )}
+    </div>
+  )
+}
