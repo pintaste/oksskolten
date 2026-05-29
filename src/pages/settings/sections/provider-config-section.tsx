@@ -1,71 +1,248 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import useSWR from 'swr'
-import { fetcher, apiPost, apiPatch } from '../../../lib/fetcher'
+import { fetcher, apiPost, apiPatch, apiDelete } from '../../../lib/fetcher'
 import { PROVIDER_LABELS, LLM_API_PROVIDERS, TRANSLATE_SERVICE_PROVIDERS } from '../../../data/aiModels'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
-import { ExternalLink, CircleDot, CircleCheck, CircleSlash, ChevronDown } from 'lucide-react'
-import type { Settings } from '../../../hooks/use-settings'
+import { ExternalLink, CircleDot, CircleCheck, CircleSlash, ChevronDown, Pencil, Trash2, Search, Download, Zap, RotateCcw, EyeOff, Puzzle } from 'lucide-react'
+import { isMessageKey } from '../../../lib/i18n'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 type TFunc = (key: any, params?: Record<string, string>) => string
 
-export function ProviderConfigSection({ t, settings }: { t: TFunc; settings: Settings }) {
+type CustomApiFormat = 'openai' | 'anthropic'
+
+const HIDEABLE_LLM_PROVIDERS = new Set([
+  'anthropic',
+  'gemini',
+  'openai',
+  'deepseek',
+  'mimo',
+  'claude-code',
+  'ollama',
+  'vllm',
+])
+
+interface ProviderConfigSectionProps {
+  t: TFunc
+  hiddenProviders: string[]
+  setHiddenProvider: (provider: string, hidden: boolean) => void
+}
+
+function getProviderConnectedLabel(t: TFunc, provider: string) {
+  const connectedKey = `${provider}.connected`
+  return isMessageKey(connectedKey) ? t(connectedKey) : ''
+}
+
+function getProviderConnectionFailedLabel(t: TFunc, provider: string) {
+  const failedKey = `${provider}.connectionFailed`
+  return isMessageKey(failedKey) ? t(failedKey) : t('ollama.connectionFailed')
+}
+
+function getProviderStatusText(
+  t: TFunc,
+  provider: string,
+  isConfigured: boolean,
+  testResult: { ok: boolean } | null,
+) {
+  if (!isConfigured) return t('chat.apiKeyNotSet')
+  if (!testResult) return getProviderConnectedLabel(t, provider)
+  return testResult.ok ? getProviderConnectedLabel(t, provider) : t('chat.apiKeyNotSet')
+}
+
+function ProviderConnectionError({
+  testResult,
+  label,
+  as,
+  className,
+}: {
+  testResult: { ok: boolean; error?: string } | null
+  label: string
+  as?: 'p' | 'span'
+  className?: string
+}) {
+  if (!testResult || testResult.ok || !testResult.error) return null
+  if (as === 'span') {
+    return <span className={className ?? 'text-xs text-error'}>{`${label}: ${testResult.error}`}</span>
+  }
+  return <p className={className ?? 'text-xs text-error'}>{`${label}: ${testResult.error}`}</p>
+}
+
+function IconBtn({ onClick, title, disabled, children, className }: {
+  onClick?: () => void
+  title: string
+  disabled?: boolean
+  children: React.ReactNode
+  className?: string
+}) {
   return (
-    <section className="space-y-6">
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:opacity-50 ${className ?? ''}`}
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+function CollapsibleCardWrapper({
+  header,
+  actions,
+  children,
+}: {
+  header: React.ReactNode
+  actions?: React.ReactNode
+  children: React.ReactNode
+}) {
+  const [collapsed, setCollapsed] = useState(true)
+  return (
+    <div className="min-w-0 rounded-lg bg-bg-card border border-border shadow-sm overflow-hidden">
+      <div
+        className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer select-none hover:bg-hover"
+        onClick={() => setCollapsed(c => !c)}
+      >
+        <div className="flex items-center gap-2.5 flex-1 min-w-0 overflow-hidden">{header}</div>
+        {actions && (
+          <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+            {actions}
+          </div>
+        )}
+        <ChevronDown
+          size={13}
+          className={`text-muted transition-transform shrink-0 ${collapsed ? '-rotate-90' : ''}`}
+        />
+      </div>
+      {!collapsed && (
+        <div className="px-3 pb-3 pt-2 border-t border-border space-y-2.5">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function ProviderConfigSection({ t, hiddenProviders, setHiddenProvider }: ProviderConfigSectionProps) {
+  const hiddenProviderSet = useMemo(() => new Set(hiddenProviders), [hiddenProviders])
+  const { data: customProviderData, mutate: mutateCustomProviders } = useSWR<{ providers: StoredCustomProvider[] }>(
+    '/api/settings/custom-providers',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+  const customProviders = customProviderData?.providers || []
+  const refreshCustomProviders = useCallback(() => {
+    void mutateCustomProviders()
+  }, [mutateCustomProviders])
+
+  function handleHideProvider(provider: string) {
+    if (!HIDEABLE_LLM_PROVIDERS.has(provider)) return
+    setHiddenProvider(provider, true)
+  }
+
+  return (
+    <section className="space-y-7">
       <div>
         <h2 className="text-base font-semibold text-text mb-1">{t('integration.llmProviderConfig')}</h2>
-        <p className="text-xs text-muted mb-4">{t('integration.llmProviderConfigDesc')}</p>
-        <div className="space-y-3">
+        <p className="text-xs text-muted mb-3">{t('integration.llmProviderConfigDesc')}</p>
+        <div className="grid grid-cols-1 gap-2.5 items-start">
           {LLM_API_PROVIDERS.filter(p => p !== 'deepseek' && p !== 'mimo' && p !== 'anthropic').map(provider => (
-            <ApiProviderCard key={provider} provider={provider} t={t} />
+            !hiddenProviderSet.has(provider) && (
+              <ApiProviderCard
+                key={provider}
+                provider={provider}
+                t={t}
+                onHideProvider={handleHideProvider}
+                isHidable={HIDEABLE_LLM_PROVIDERS.has(provider)}
+              />
+            )
           ))}
-          <AnthropicCard t={t} />
-          <DeepSeekCard t={t} />
-          <MimoCard t={t} />
-          <ClaudeCodeCard t={t} />
-          <OllamaCard t={t} />
-          <VllmCard t={t} />
-          <CustomCard t={t} />
+          {!hiddenProviderSet.has('anthropic') && (
+            <AnthropicCard t={t} onHideProvider={handleHideProvider} isHidable={HIDEABLE_LLM_PROVIDERS.has('anthropic')} />
+          )}
+          {!hiddenProviderSet.has('deepseek') && (
+            <DeepSeekCard t={t} onHideProvider={handleHideProvider} isHidable={HIDEABLE_LLM_PROVIDERS.has('deepseek')} />
+          )}
+          {!hiddenProviderSet.has('mimo') && (
+            <MimoCard t={t} onHideProvider={handleHideProvider} isHidable={HIDEABLE_LLM_PROVIDERS.has('mimo')} />
+          )}
+          {!hiddenProviderSet.has('claude-code') && (
+            <ClaudeCodeCard t={t} onHideProvider={handleHideProvider} isHidable={HIDEABLE_LLM_PROVIDERS.has('claude-code')} />
+          )}
+          {!hiddenProviderSet.has('ollama') && (
+            <OllamaCard t={t} onHideProvider={handleHideProvider} isHidable={HIDEABLE_LLM_PROVIDERS.has('ollama')} />
+          )}
+          {!hiddenProviderSet.has('vllm') && (
+            <VllmCard t={t} onHideProvider={handleHideProvider} isHidable={HIDEABLE_LLM_PROVIDERS.has('vllm')} />
+          )}
+          {customProviders.map(provider => (
+            <CustomProviderCard
+              key={provider.id}
+              provider={provider}
+              t={t}
+              onSaved={refreshCustomProviders}
+            />
+          ))}
+          <CustomCard t={t} onSaved={refreshCustomProviders} />
         </div>
+
+        {/* Hidden providers shortcuts — restored here, below Custom */}
+        {hiddenProviders.length > 0 && (
+          <div className="mt-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted mb-2 select-none">{t('integration.hiddenProviders')}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {hiddenProviders.map(p => {
+                const labelKey = PROVIDER_LABELS[p as keyof typeof PROVIDER_LABELS]
+                const label = labelKey && isMessageKey(labelKey) ? t(labelKey) : (labelKey || p)
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setHiddenProvider(p, false)}
+                    className="px-2.5 py-1 text-xs font-medium rounded-lg border border-border bg-bg-card text-muted hover:text-text hover:bg-hover transition-colors select-none"
+                  >
+                    + {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
-      <div>
+      <div className="border-t border-border pt-5">
         <h2 className="text-base font-semibold text-text mb-1">{t('integration.translateServiceConfig')}</h2>
-        <p className="text-xs text-muted mb-4">{t('integration.translateServiceConfigDesc')}</p>
-        <div className="space-y-3">
+        <p className="text-xs text-muted mb-3">{t('integration.translateServiceConfigDesc')}</p>
+        <div className="grid grid-cols-1 gap-2.5 items-start">
           {TRANSLATE_SERVICE_PROVIDERS.map(provider => (
             <ApiProviderCard key={provider} provider={provider} t={t} />
           ))}
-        </div>
-        <div className="mt-4">
-          <h3 className="text-sm font-medium text-text mb-1">{t('settings.translateTargetLang')}</h3>
-          <p className="text-xs text-muted mb-3">{t('settings.translateTargetLangDesc')}</p>
-          <div className="flex rounded-md bg-bg-subtle p-0.5">
-            {([
-              { value: '', label: t('settings.translateTargetLangAuto') },
-              { value: 'ja', label: t('settings.languageJa') },
-              { value: 'en', label: t('settings.languageEn') },
-            ] as const).map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => settings.setTranslateTargetLang(opt.value)}
-                className={`flex-1 px-2 py-1.5 text-xs rounded transition-colors select-none ${
-                  (settings.translateTargetLang || '') === opt.value
-                    ? 'bg-accent text-accent-text font-medium shadow-sm'
-                    : 'text-muted hover:text-text'
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
     </section>
   )
 }
 
-function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
+interface ApiProviderCardProps {
+  provider: string
+  t: TFunc
+  onHideProvider?: (provider: string) => void
+  isHidable?: boolean
+}
+
+function ApiProviderCard({ provider, t, onHideProvider, isHidable }: ApiProviderCardProps) {
   const { data: keyStatus, mutate: mutateKeyStatus } = useSWR<{ configured: boolean }>(
     `/api/settings/api-keys/${provider}`,
     fetcher,
@@ -85,7 +262,6 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
   const [baseUrlInput, setBaseUrlInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; error?: string } | null>(null)
 
@@ -95,6 +271,16 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
     setBaseUrlInput(prefs[`${provider}.base_url`] || '')
     setInitialized(true)
   }, [prefs, initialized, provider])
+
+  // Auto-test on first load when configured
+  const autoTested = useRef(false)
+  useEffect(() => {
+    if (autoTested.current || isConfigured === undefined) return
+    if (!isConfigured) return
+    autoTested.current = true
+    void handleTest()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConfigured])
 
   function showMessage(text: string, type: 'success' | 'error') {
     setMessage({ text, type })
@@ -117,6 +303,11 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
     : provider === 'google-translate' ? 'AIza...'
     : provider === 'deepl' ? '...'
     : 'sk-ant-...'
+  const apiKeyHelpLink = provider === 'google-translate'
+    ? { href: 'https://cloud.google.com/translate/docs/setup', label: t('googleTranslate.getApiKey') }
+    : provider === 'deepl'
+      ? { href: 'https://www.deepl.com/en/account/summary', label: t('deepl.getApiKey') }
+      : null
 
   async function handleSave() {
     if (saving) return
@@ -134,6 +325,8 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
       void mutatePrefs()
       setApiKeyInput('')
       showMessage(savedMsg, 'success')
+      // auto-test after saving
+      void handleTest()
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
     } finally {
@@ -145,9 +338,15 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
     if (saving) return
     setSaving(true)
     try {
-      await apiPost(endpoint, { apiKey: '' })
+      await Promise.all([
+        apiPost(endpoint, { apiKey: '' }),
+        isLlmProvider ? apiPatch('/api/settings/preferences', { [`${provider}.base_url`]: '' }) : Promise.resolve(),
+      ])
       void mutateKeyStatus()
+      void mutatePrefs()
       setApiKeyInput('')
+      setBaseUrlInput('')
+      setTestResult(null)
       showMessage(deletedMsg, 'success')
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Delete failed', 'error')
@@ -171,125 +370,103 @@ function ApiProviderCard({ provider, t }: { provider: string; t: TFunc }) {
   }, [testing, provider])
 
   const hasChanges = !!apiKeyInput || (isLlmProvider && baseUrlInput !== savedBaseUrl)
+  const dotClass = hasChanges ? 'bg-error' : testResult?.ok ? 'bg-success' : testResult ? 'bg-error' : 'bg-muted'
+  const statusText = getProviderStatusText(t, provider, !!isConfigured, testResult)
 
   return (
-    <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${isConfigured ? 'bg-success' : 'bg-error'}`} />
-          <span className="text-sm font-medium text-text select-none">{t(PROVIDER_LABELS[provider])}</span>
-          <span className="text-xs text-muted select-none">
-            {isConfigured ? t('chat.apiKeyConfigured') : t('chat.apiKeyNotSet')}
-          </span>
-        </div>
+    <CollapsibleCardWrapper
+      header={<>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+        <span className="text-sm font-medium text-text">{t(PROVIDER_LABELS[provider])}</span>
+        <span className="text-xs text-muted truncate">{statusText}</span>
+      </>}
+      actions={<>
         {isConfigured && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={saving}
-            className="px-3 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-          >
-            {t('chat.apiKeyDelete')}
-          </button>
+          <IconBtn onClick={handleTest} disabled={testing}
+            title={t('ollama.testConnection')}
+            className="p-1 text-muted hover:text-text transition-colors disabled:opacity-50">
+            <Zap size={13} className={testing ? 'animate-pulse' : ''} />
+          </IconBtn>
         )}
-      </div>
-
-      {!isConfigured && (
-        <FormField label={t('chat.apiKey')} compact>
-          <div className="flex items-center gap-2">
-          <Input
-            type="password"
-            value={apiKeyInput}
-            onChange={e => setApiKeyInput(e.target.value)}
-            placeholder={placeholder}
-            className="flex-1 py-1.5"
-          />
-          </div>
-        </FormField>
-      )}
-
-      {isConfigured && (
-        <FormField label={t('chat.apiKey')} compact>
-          <div className="flex items-center gap-2">
-          <Input
-            type="password"
-            value={apiKeyInput}
-            onChange={e => setApiKeyInput(e.target.value)}
-            placeholder="••••••••"
-            className="flex-1 py-1.5"
-          />
-          </div>
-        </FormField>
-      )}
+        {isConfigured && (
+          <IconBtn onClick={handleDelete} disabled={saving}
+            title={t('chat.apiKeyDelete')} className="p-1 text-muted/60 hover:text-error transition-colors disabled:opacity-50">
+            <RotateCcw size={13} />
+          </IconBtn>
+        )}
+        {isHidable && onHideProvider && (
+          <IconBtn onClick={() => onHideProvider(provider)}
+            title={t('integration.removeProvider')}
+            className="p-1 text-muted/60 hover:text-muted transition-colors">
+            <EyeOff size={13} />
+          </IconBtn>
+        )}
+      </>}
+    >
+      <FormField
+        label={
+          <span className="flex items-center w-full gap-2">
+            <span className="truncate">{t('chat.apiKey')}</span>
+            {apiKeyHelpLink && (
+              <a
+                href={apiKeyHelpLink.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto text-xs text-accent hover:underline"
+              >
+                {apiKeyHelpLink.label}
+              </a>
+            )}
+          </span>
+        }
+        compact
+      >
+        <Input
+          type="password"
+          value={apiKeyInput}
+          onChange={e => setApiKeyInput(e.target.value)}
+          placeholder={isConfigured ? '••••••••' : placeholder}
+          className="py-1.5"
+        />
+      </FormField>
 
       {isLlmProvider && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setAdvancedOpen(!advancedOpen)}
-            className="flex items-center gap-1 text-[11px] text-muted hover:text-text transition-colors select-none"
-          >
-            <ChevronDown size={12} className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
-            {t('anthropic.advanced')}
-          </button>
-          {advancedOpen && (
-            <div className="mt-1.5">
-              <FormField label={t('anthropic.baseUrl')} hint={t('anthropic.baseUrlDesc')} compact>
-                <Input
-                  type="text"
-                  value={baseUrlInput}
-                  onChange={e => setBaseUrlInput(e.target.value)}
-                  placeholder={t('anthropic.baseUrlPlaceholder')}
-                  className="py-1.5"
-                />
-              </FormField>
-            </div>
-          )}
-        </div>
+        <FormField label={<span>{t('anthropic.baseUrl')} <span className="font-normal text-muted/70">({t('anthropic.baseUrlDesc')})</span></span>} compact>
+          <Input type="text" value={baseUrlInput} onChange={e => setBaseUrlInput(e.target.value)}
+            placeholder={t('anthropic.baseUrlPlaceholder')} className="py-1.5" />
+        </FormField>
       )}
 
-      {(hasChanges || isConfigured) && (
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
-            >
-              {saving ? '...' : t('settings.save')}
-            </button>
-          )}
-          {isConfigured && (
-            <button
-              type="button"
-              onClick={handleTest}
-              disabled={testing}
-              className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-            >
-              {testing ? t('ollama.testing') : t('ollama.testConnection')}
-            </button>
-          )}
-          {testResult && (
-            <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
-              {testResult.ok
-                ? t('ollama.connected')
-                : `${t('ollama.connectionFailed')}: ${testResult.error}`}
-            </span>
-          )}
-        </div>
-      )}
+      <div className="flex items-center gap-1.5">
+        {hasChanges && (
+          <button type="button" onClick={handleSave} disabled={saving}
+            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0">
+            {saving ? '...' : t('settings.save')}
+          </button>
+        )}
+        <ProviderConnectionError
+          testResult={testResult}
+          label={getProviderConnectionFailedLabel(t, provider)}
+          as="span"
+        />
+      </div>
 
       {message && (
-        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
-          {message.text}
-        </p>
+        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>{message.text}</p>
       )}
-    </div>
+    </CollapsibleCardWrapper>
   )
 }
 
-function ClaudeCodeCard({ t }: { t: TFunc }) {
+function ClaudeCodeCard({
+  t,
+  onHideProvider,
+  isHidable,
+}: {
+  t: TFunc
+  onHideProvider?: (provider: string) => void
+  isHidable?: boolean
+}) {
   const { data: authStatus } = useSWR<{ loggedIn?: boolean; email?: string; plan?: string; error?: string }>(
     '/api/chat/claude-code-status',
     fetcher,
@@ -323,12 +500,20 @@ function ClaudeCodeCard({ t }: { t: TFunc }) {
   }
 
   return (
-    <div className="p-3 rounded-lg bg-bg-card border border-border min-h-[3rem] space-y-2">
-      <div className="flex items-center gap-2">
+    <CollapsibleCardWrapper
+      header={<>
         <span className={`w-2 h-2 rounded-full shrink-0 ${statusDot}`} />
-        <span className="text-sm font-medium text-text select-none">{t(PROVIDER_LABELS['claude-code'])}</span>
-        <span className="text-xs text-muted select-none">{statusText}</span>
-      </div>
+        <span className="text-sm font-medium text-text">{t(PROVIDER_LABELS['claude-code'])}</span>
+        <span className="text-xs text-muted">{statusText}</span>
+      </>}
+      actions={isHidable && onHideProvider ? (
+        <IconBtn onClick={() => onHideProvider('claude-code')}
+          title={t('integration.removeProvider')}
+          className="p-1 text-muted/60 hover:text-muted transition-colors">
+            <EyeOff size={13} />
+          </IconBtn>
+      ) : undefined}
+    >
       <div className="rounded-md bg-bg-subtle px-3 py-2 text-xs text-muted select-none">
         <p>{t('chat.authNote')}</p>
         <div className="mt-1.5 space-y-0.5 text-[11px] text-muted/70">
@@ -353,13 +538,9 @@ function ClaudeCodeCard({ t }: { t: TFunc }) {
               { id: 33269, title: 'OAuth login fails due to Cloudflare race condition', status: 'open' },
               { id: 34575, title: 'MCP connector sync + setup-token', status: 'open' },
             ] as { id: number; title: string; status: 'open' | 'completed' | 'not_planned' }[]).map(({ id, title, status }) => (
-              <a
-                key={id}
-                href={`https://github.com/anthropics/claude-code/issues/${id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 pl-2 hover:text-muted underline"
-              >
+              <a key={id} href={`https://github.com/anthropics/claude-code/issues/${id}`}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 pl-2 hover:text-muted underline">
                 {status === 'open' && <CircleDot size={10} className="shrink-0 text-success" />}
                 {status === 'completed' && <CircleCheck size={10} className="shrink-0 text-purple-500" />}
                 {status === 'not_planned' && <CircleSlash size={10} className="shrink-0 text-muted/50" />}
@@ -371,11 +552,19 @@ function ClaudeCodeCard({ t }: { t: TFunc }) {
           </div>
         </details>
       </div>
-    </div>
+    </CollapsibleCardWrapper>
   )
 }
 
-function OllamaCard({ t }: { t: TFunc }) {
+function OllamaCard({
+  t,
+  onHideProvider,
+  isHidable,
+}: {
+  t: TFunc
+  onHideProvider?: (provider: string) => void
+  isHidable?: boolean
+}) {
   const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
     '/api/settings/preferences',
     fetcher,
@@ -383,6 +572,7 @@ function OllamaCard({ t }: { t: TFunc }) {
   )
   const savedBaseUrl = prefs?.['ollama.base_url'] || ''
   const savedHeadersJson = prefs?.['ollama.custom_headers'] || ''
+  const isConfigured = !!savedBaseUrl || !!savedHeadersJson
   const [baseUrlInput, setBaseUrlInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
@@ -450,28 +640,48 @@ function OllamaCard({ t }: { t: TFunc }) {
     }
   }, [testing])
 
+  const autoTested = useRef(false)
+  useEffect(() => {
+    if (autoTested.current) return
+    autoTested.current = true
+    void handleTest()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const removeHeader = useCallback((index: number) => {
     setHeaders(prev => prev.filter((_, i) => i !== index))
   }, [])
 
   const currentHeadersJson = headersToJson(headers)
   const hasChanges = baseUrlInput !== savedBaseUrl || currentHeadersJson !== (savedHeadersJson || '')
+  const dotClass = hasChanges ? 'bg-error' : testResult?.ok ? 'bg-success' : testResult ? 'bg-error' : 'bg-muted'
+  const statusText = getProviderStatusText(t, 'ollama', isConfigured, testResult)
 
   return (
-    <div className="p-3 rounded-lg bg-bg-card border border-border min-h-[3rem] space-y-2">
-      <div className="flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full shrink-0 ${testResult?.ok ? 'bg-success' : savedBaseUrl ? 'bg-warning' : 'bg-muted'}`} />
-        <span className="text-sm font-medium text-text select-none">{t('provider.ollama')}</span>
-      </div>
-
+      <CollapsibleCardWrapper
+        header={<>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+          <span className="text-sm font-medium text-text">{t('provider.ollama')}</span>
+          {statusText && <span className="text-xs text-muted truncate">{statusText}</span>}
+        </>}
+      actions={<>
+        <IconBtn onClick={handleTest} disabled={testing}
+          title={t('ollama.testConnection')}
+          className="p-1 text-muted hover:text-text transition-colors disabled:opacity-50">
+          <Zap size={13} className={testing ? 'animate-pulse' : ''} />
+        </IconBtn>
+        {isHidable && onHideProvider && (
+          <IconBtn onClick={() => onHideProvider('ollama')}
+            title={t('integration.removeProvider')}
+            className="p-1 text-muted/60 hover:text-muted transition-colors">
+            <EyeOff size={13} />
+          </IconBtn>
+        )}
+      </>}
+    >
       <FormField label={t('ollama.baseUrl')} hint={t('ollama.baseUrlDesc')} compact>
-        <Input
-          type="text"
-          value={baseUrlInput}
-          onChange={e => setBaseUrlInput(e.target.value)}
-          placeholder={t('ollama.baseUrlPlaceholder')}
-          className="py-1.5"
-        />
+        <Input type="text" value={baseUrlInput} onChange={e => setBaseUrlInput(e.target.value)}
+          placeholder={t('ollama.baseUrlPlaceholder')} className="py-1.5" />
       </FormField>
 
       <div>
@@ -479,80 +689,51 @@ function OllamaCard({ t }: { t: TFunc }) {
           <span className="text-xs font-medium text-text select-none">{t('ollama.customHeaders')}</span>
           <span className="text-[11px] text-muted select-none">{t('ollama.customHeadersDesc')}</span>
         </div>
-
         {headers.map((h, i) => (
           <div key={i} className="flex items-center gap-1.5 mb-1">
-            <Input
-              type="text"
-              value={h.key}
+            <Input type="text" value={h.key}
               onChange={e => setHeaders(prev => prev.map((item, j) => j === i ? { ...item, key: e.target.value } : item))}
-              placeholder={t('ollama.headerKey')}
-              className="w-[200px] py-1 text-xs"
-            />
-            <Input
-              type="text"
-              value={h.value}
+              placeholder={t('ollama.headerKey')} className="w-[200px] py-1 text-xs" />
+            <Input type="text" value={h.value}
               onChange={e => setHeaders(prev => prev.map((item, j) => j === i ? { ...item, value: e.target.value } : item))}
-              placeholder={t('ollama.headerValue')}
-              className="flex-1 py-1 text-xs"
-            />
-            <button
-              type="button"
-              onClick={() => removeHeader(i)}
-              className="px-1.5 py-1 text-xs text-muted hover:text-error transition-colors select-none shrink-0"
-            >
-              ×
-            </button>
+              placeholder={t('ollama.headerValue')} className="flex-1 py-1 text-xs" />
+            <button type="button" onClick={() => removeHeader(i)}
+              className="px-1.5 py-1 text-xs text-muted hover:text-error transition-colors select-none shrink-0">×</button>
           </div>
         ))}
-
-        <button
-          type="button"
-          onClick={() => setHeaders(prev => [...prev, { key: '', value: '' }])}
-          className="px-2 py-1 text-xs rounded border border-border text-muted hover:text-text hover:bg-hover transition-colors select-none"
-        >
+        <button type="button" onClick={() => setHeaders(prev => [...prev, { key: '', value: '' }])}
+          className="px-2 py-1 text-xs rounded border border-border text-muted hover:text-text hover:bg-hover transition-colors select-none">
           + {t('ollama.addHeader')}
         </button>
       </div>
 
-      <div className="flex items-center gap-2">
-        {hasChanges && (
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
-          >
+      {hasChanges && (
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={handleSave} disabled={saving}
+            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0">
             {saving ? '...' : t('settings.save')}
           </button>
-        )}
-        <button
-          type="button"
-          onClick={handleTest}
-          disabled={testing}
-          className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-        >
-          {testing ? t('ollama.testing') : t('ollama.testConnection')}
-        </button>
-        {testResult && (
-          <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
-            {testResult.ok
-              ? `${t('ollama.connected')} (v${testResult.version}, ${testResult.model_count} models)`
-              : `${t('ollama.connectionFailed')}: ${testResult.error}`}
-          </span>
-        )}
-      </div>
-
-      {message && (
-        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
-          {message.text}
-        </p>
+        </div>
       )}
-    </div>
+      <ProviderConnectionError
+        testResult={testResult}
+        label={getProviderConnectionFailedLabel(t, 'ollama')}
+      />
+
+      {message && <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>{message.text}</p>}
+    </CollapsibleCardWrapper>
   )
 }
 
-function VllmCard({ t }: { t: TFunc }) {
+function VllmCard({
+  t,
+  onHideProvider,
+  isHidable,
+}: {
+  t: TFunc
+  onHideProvider?: (provider: string) => void
+  isHidable?: boolean
+}) {
   const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
     '/api/settings/preferences',
     fetcher,
@@ -613,15 +794,22 @@ function VllmCard({ t }: { t: TFunc }) {
     if (saving) return
     setSaving(true)
     try {
-      await apiPost('/api/settings/api-keys/vllm', { apiKey: '' })
+      await Promise.all([
+        apiPost('/api/settings/api-keys/vllm', { apiKey: '' }),
+        apiPatch('/api/settings/preferences', { 'vllm.base_url': '' }),
+      ])
       void mutateKeyStatus()
+      void mutatePrefs()
+      setApiKeyInput('')
+      setBaseUrlInput('')
+      setTestResult(null)
       showMessage(t('vllm.apiKeyDeleted'), 'success')
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Delete failed', 'error')
     } finally {
       setSaving(false)
     }
-  }, [saving, mutateKeyStatus, t])
+  }, [saving, mutateKeyStatus, mutatePrefs, t])
 
   const handleTest = useCallback(async () => {
     if (testing) return
@@ -637,85 +825,84 @@ function VllmCard({ t }: { t: TFunc }) {
     }
   }, [testing])
 
+  const autoTested = useRef(false)
+  useEffect(() => {
+    if (autoTested.current) return
+    autoTested.current = true
+    void handleTest()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const hasChanges = baseUrlInput !== savedBaseUrl || !!apiKeyInput
+  const dotClass = hasChanges ? 'bg-error' : testResult?.ok ? 'bg-success' : testResult ? 'bg-error' : 'bg-muted'
+  const statusText = getProviderStatusText(t, 'vllm', !!isConfigured, testResult)
 
   return (
-    <div className="p-3 rounded-lg bg-bg-card border border-border min-h-[3rem] space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${testResult?.ok ? 'bg-success' : savedBaseUrl ? 'bg-warning' : 'bg-muted'}`} />
-          <span className="text-sm font-medium text-text select-none">{t('provider.vllm')}</span>
-        </div>
+      <CollapsibleCardWrapper
+        header={<>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+          <span className="text-sm font-medium text-text">{t('provider.vllm')}</span>
+          {statusText && <span className="text-xs text-muted truncate">{statusText}</span>}
+        </>}
+      actions={<>
+        <IconBtn onClick={handleTest} disabled={testing}
+          title={t('vllm.testConnection')}
+          className="p-1 text-muted hover:text-text transition-colors disabled:opacity-50">
+          <Zap size={13} className={testing ? 'animate-pulse' : ''} />
+        </IconBtn>
         {isConfigured && (
-          <button
-            type="button"
-            onClick={handleDeleteKey}
-            disabled={saving}
-            className="px-3 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-          >
-            {t('chat.apiKeyDelete')}
-          </button>
+          <IconBtn onClick={handleDeleteKey} disabled={saving}
+            title={t('chat.apiKeyDelete')} className="p-1 text-muted/60 hover:text-error transition-colors disabled:opacity-50">
+            <RotateCcw size={13} />
+          </IconBtn>
         )}
-      </div>
-
+        {isHidable && onHideProvider && (
+          <IconBtn onClick={() => onHideProvider('vllm')}
+            title={t('integration.removeProvider')}
+            className="p-1 text-muted/60 hover:text-muted transition-colors">
+            <EyeOff size={13} />
+          </IconBtn>
+        )}
+      </>}
+    >
       <FormField label={t('vllm.baseUrl')} hint={t('vllm.baseUrlDesc')} compact>
-        <Input
-          type="text"
-          value={baseUrlInput}
-          onChange={e => setBaseUrlInput(e.target.value)}
-          placeholder={t('vllm.baseUrlPlaceholder')}
-          className="py-1.5"
-        />
+        <Input type="text" value={baseUrlInput} onChange={e => setBaseUrlInput(e.target.value)}
+          placeholder={t('vllm.baseUrlPlaceholder')} className="py-1.5" />
       </FormField>
-
       <FormField label={t('chat.apiKey')} compact>
-        <Input
-          type="password"
-          value={apiKeyInput}
-          onChange={e => setApiKeyInput(e.target.value)}
-          placeholder={isConfigured ? '••••••••' : '...'}
-          className="py-1.5"
-        />
+        <Input type="password" value={apiKeyInput} onChange={e => setApiKeyInput(e.target.value)}
+          placeholder={isConfigured ? '••••••••' : '...'} className="py-1.5" />
       </FormField>
 
-      <div className="flex items-center gap-2">
-        {hasChanges && (
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
-          >
-            {saving ? '...' : t('settings.save')}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={handleTest}
-          disabled={testing}
-          className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-        >
-          {testing ? t('vllm.testing') : t('vllm.testConnection')}
-        </button>
-        {testResult && (
-          <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
-            {testResult.ok
-              ? `${t('vllm.connected')} (${testResult.model_count} models)`
-              : `${t('vllm.connectionFailed')}: ${testResult.error}`}
-          </span>
-        )}
-      </div>
-
-      {message && (
-        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
-          {message.text}
-        </p>
+      {hasChanges && (
+        <div className="flex items-center gap-1.5">
+          {hasChanges && (
+            <button type="button" onClick={handleSave} disabled={saving}
+              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0">
+              {saving ? '...' : t('settings.save')}
+            </button>
+          )}
+        </div>
       )}
-    </div>
+      <ProviderConnectionError
+        testResult={testResult}
+        label={getProviderConnectionFailedLabel(t, 'vllm')}
+      />
+
+      {message && <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>{message.text}</p>}
+    </CollapsibleCardWrapper>
   )
 }
 
-function DeepSeekCard({ t }: { t: TFunc }) {
+function DeepSeekCard({
+  t,
+  onHideProvider,
+  isHidable,
+}: {
+  t: TFunc
+  onHideProvider?: (provider: string) => void
+  isHidable?: boolean
+}) {
   const { data: keyStatus, mutate: mutateKeyStatus } = useSWR<{ configured: boolean }>(
     '/api/settings/api-keys/deepseek',
     fetcher,
@@ -736,7 +923,7 @@ function DeepSeekCard({ t }: { t: TFunc }) {
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; error?: string } | null>(null)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
+
 
   const [initialized, setInitialized] = useState(false)
   useEffect(() => {
@@ -766,6 +953,7 @@ function DeepSeekCard({ t }: { t: TFunc }) {
       void mutatePrefs()
       setApiKeyInput('')
       showMessage(t('deepseek.apiKeySaved'), 'success')
+      void handleTest()
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
     } finally {
@@ -777,9 +965,15 @@ function DeepSeekCard({ t }: { t: TFunc }) {
     if (saving) return
     setSaving(true)
     try {
-      await apiPost('/api/settings/api-keys/deepseek', { apiKey: '' })
+      await Promise.all([
+        apiPost('/api/settings/api-keys/deepseek', { apiKey: '' }),
+        apiPatch('/api/settings/preferences', { 'deepseek.base_url': '' }),
+      ])
       void mutateKeyStatus()
+      void mutatePrefs()
       setApiKeyInput('')
+      setBaseUrlInput('')
+      setTestResult(null)
       showMessage(t('deepseek.apiKeyDeleted'), 'success')
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Delete failed', 'error')
@@ -802,124 +996,85 @@ function DeepSeekCard({ t }: { t: TFunc }) {
     }
   }, [testing])
 
+  const autoTested = useRef(false)
+  useEffect(() => {
+    if (autoTested.current || isConfigured === undefined) return
+    if (!isConfigured) return
+    autoTested.current = true
+    void handleTest()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConfigured])
+
   const hasChanges = !!apiKeyInput || baseUrlInput !== savedBaseUrl
+  const dotClass = hasChanges ? 'bg-error' : testResult?.ok ? 'bg-success' : testResult ? 'bg-error' : 'bg-muted'
+  const statusText = getProviderStatusText(t, 'deepseek', !!isConfigured, testResult)
 
   return (
-    <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${isConfigured ? 'bg-success' : 'bg-error'}`} />
-          <span className="text-sm font-medium text-text select-none">{t(PROVIDER_LABELS['deepseek'])}</span>
-          <span className="text-xs text-muted select-none">
-            {isConfigured ? t('chat.apiKeyConfigured') : t('chat.apiKeyNotSet')}
-          </span>
-        </div>
+    <CollapsibleCardWrapper
+      header={<>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+        <span className="text-sm font-medium text-text">{t(PROVIDER_LABELS['deepseek'])}</span>
+        <span className="text-xs text-muted truncate">{statusText}</span>
+      </>}
+      actions={<>
+        <IconBtn onClick={handleTest} disabled={testing}
+          title={t('deepseek.testConnection')}
+          className="p-1 text-muted hover:text-text transition-colors disabled:opacity-50">
+          <Zap size={13} className={testing ? 'animate-pulse' : ''} />
+        </IconBtn>
         {isConfigured && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={saving}
-            className="px-3 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-          >
-            {t('chat.apiKeyDelete')}
+          <IconBtn onClick={handleDelete} disabled={saving}
+            title={t('chat.apiKeyDelete')} className="p-1 text-muted/60 hover:text-error transition-colors disabled:opacity-50">
+            <RotateCcw size={13} />
+          </IconBtn>
+        )}
+        {isHidable && onHideProvider && (
+          <IconBtn onClick={() => onHideProvider('deepseek')}
+            title={t('integration.removeProvider')}
+            className="p-1 text-muted/60 hover:text-muted transition-colors">
+            <EyeOff size={13} />
+          </IconBtn>
+        )}
+      </>}
+    >
+      <FormField label={t('chat.apiKey')} compact>
+        <Input type="password" value={apiKeyInput} onChange={e => setApiKeyInput(e.target.value)}
+          placeholder={isConfigured ? '••••••••' : 'sk-...'} className="py-1.5" />
+      </FormField>
+
+      <FormField label={<span>{t('anthropic.baseUrl')} <span className="font-normal text-muted/70">({t('anthropic.baseUrlDesc')})</span></span>} compact>
+        <Input type="text" value={baseUrlInput} onChange={e => setBaseUrlInput(e.target.value)}
+          placeholder={t('anthropic.baseUrlPlaceholder')} className="py-1.5" />
+      </FormField>
+
+      {hasChanges && (
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={handleSave} disabled={saving}
+            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0">
+            {saving ? '...' : t('settings.save')}
           </button>
-        )}
-      </div>
-
-      {!isConfigured && (
-        <FormField label={t('chat.apiKey')} compact>
-          <div className="flex items-center gap-2">
-          <Input
-            type="password"
-            value={apiKeyInput}
-            onChange={e => setApiKeyInput(e.target.value)}
-            placeholder="sk-..."
-            className="flex-1 py-1.5"
-          />
-          </div>
-        </FormField>
-      )}
-
-      {isConfigured && (
-        <FormField label={t('chat.apiKey')} compact>
-          <div className="flex items-center gap-2">
-          <Input
-            type="password"
-            value={apiKeyInput}
-            onChange={e => setApiKeyInput(e.target.value)}
-            placeholder="••••••••"
-            className="flex-1 py-1.5"
-          />
-          </div>
-        </FormField>
-      )}
-
-      <div>
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen(!advancedOpen)}
-          className="flex items-center gap-1 text-[11px] text-muted hover:text-text transition-colors select-none"
-        >
-          <ChevronDown size={12} className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
-          {t('anthropic.advanced')}
-        </button>
-        {advancedOpen && (
-          <div className="mt-1.5">
-            <FormField label={t('anthropic.baseUrl')} hint={t('anthropic.baseUrlDesc')} compact>
-              <Input
-                type="text"
-                value={baseUrlInput}
-                onChange={e => setBaseUrlInput(e.target.value)}
-                placeholder={t('anthropic.baseUrlPlaceholder')}
-                className="py-1.5"
-              />
-            </FormField>
-          </div>
-        )}
-      </div>
-
-      {(hasChanges || isConfigured) && (
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
-            >
-              {saving ? '...' : t('settings.save')}
-            </button>
-          )}
-          {isConfigured && (
-            <button
-              type="button"
-              onClick={handleTest}
-              disabled={testing}
-              className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-            >
-              {testing ? t('deepseek.testing') : t('deepseek.testConnection')}
-            </button>
-          )}
-          {testResult && (
-            <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
-              {testResult.ok
-                ? `${t('deepseek.connected')} (${testResult.model_count} models)`
-                : `${t('deepseek.connectionFailed')}: ${testResult.error}`}
-            </span>
-          )}
         </div>
       )}
+      <ProviderConnectionError
+        testResult={testResult}
+        label={getProviderConnectionFailedLabel(t, 'deepseek')}
+        as="span"
+      />
 
-      {message && (
-        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
-          {message.text}
-        </p>
-      )}
-    </div>
+      {message && <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>{message.text}</p>}
+    </CollapsibleCardWrapper>
   )
 }
 
-function MimoCard({ t }: { t: TFunc }) {
+function MimoCard({
+  t,
+  onHideProvider,
+  isHidable,
+}: {
+  t: TFunc
+  onHideProvider?: (provider: string) => void
+  isHidable?: boolean
+}) {
   const { data: keyStatus, mutate: mutateKeyStatus } = useSWR<{ configured: boolean }>(
     '/api/settings/api-keys/mimo',
     fetcher,
@@ -940,7 +1095,7 @@ function MimoCard({ t }: { t: TFunc }) {
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; error?: string } | null>(null)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
+
 
   const [initialized, setInitialized] = useState(false)
   useEffect(() => {
@@ -970,6 +1125,7 @@ function MimoCard({ t }: { t: TFunc }) {
       void mutatePrefs()
       setApiKeyInput('')
       showMessage(t('mimo.apiKeySaved'), 'success')
+      void handleTest()
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
     } finally {
@@ -981,9 +1137,15 @@ function MimoCard({ t }: { t: TFunc }) {
     if (saving) return
     setSaving(true)
     try {
-      await apiPost('/api/settings/api-keys/mimo', { apiKey: '' })
+      await Promise.all([
+        apiPost('/api/settings/api-keys/mimo', { apiKey: '' }),
+        apiPatch('/api/settings/preferences', { 'mimo.base_url': '' }),
+      ])
       void mutateKeyStatus()
+      void mutatePrefs()
       setApiKeyInput('')
+      setBaseUrlInput('')
+      setTestResult(null)
       showMessage(t('mimo.apiKeyDeleted'), 'success')
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Delete failed', 'error')
@@ -1006,302 +1168,691 @@ function MimoCard({ t }: { t: TFunc }) {
     }
   }, [testing])
 
+  const autoTested = useRef(false)
+  useEffect(() => {
+    if (autoTested.current || isConfigured === undefined) return
+    if (!isConfigured) return
+    autoTested.current = true
+    void handleTest()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConfigured])
+
   const hasChanges = !!apiKeyInput || baseUrlInput !== savedBaseUrl
+  const dotClass = hasChanges ? 'bg-error' : testResult?.ok ? 'bg-success' : testResult ? 'bg-error' : 'bg-muted'
+  const statusText = getProviderStatusText(t, 'mimo', !!isConfigured, testResult)
 
   return (
-    <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${isConfigured ? 'bg-success' : 'bg-error'}`} />
-          <span className="text-sm font-medium text-text select-none">{t(PROVIDER_LABELS['mimo'])}</span>
-          <span className="text-xs text-muted select-none">
-            {isConfigured ? t('chat.apiKeyConfigured') : t('chat.apiKeyNotSet')}
-          </span>
-        </div>
+    <CollapsibleCardWrapper
+      header={<>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+        <span className="text-sm font-medium text-text">{t(PROVIDER_LABELS['mimo'])}</span>
+        <span className="text-xs text-muted truncate">{statusText}</span>
+      </>}
+      actions={<>
+        <IconBtn onClick={handleTest} disabled={testing}
+          title={t('mimo.testConnection')}
+          className="p-1 text-muted hover:text-text transition-colors disabled:opacity-50">
+          <Zap size={13} className={testing ? 'animate-pulse' : ''} />
+        </IconBtn>
         {isConfigured && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={saving}
-            className="px-3 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-          >
-            {t('chat.apiKeyDelete')}
-          </button>
+          <IconBtn onClick={handleDelete} disabled={saving}
+            title={t('chat.apiKeyDelete')} className="p-1 text-muted/60 hover:text-error transition-colors disabled:opacity-50">
+            <RotateCcw size={13} />
+          </IconBtn>
         )}
-      </div>
+        {isHidable && onHideProvider && (
+          <IconBtn onClick={() => onHideProvider('mimo')}
+            title={t('integration.removeProvider')}
+            className="p-1 text-muted/60 hover:text-muted transition-colors">
+            <EyeOff size={13} />
+          </IconBtn>
+        )}
+      </>}
+    >
+      <FormField label={t('chat.apiKey')} compact>
+        <Input type="password" value={apiKeyInput} onChange={e => setApiKeyInput(e.target.value)}
+          placeholder={isConfigured ? '••••••••' : '...'} className="py-1.5" />
+      </FormField>
 
-      {!isConfigured && (
-        <FormField label={t('chat.apiKey')} compact>
-          <div className="flex items-center gap-2">
-          <Input
-            type="password"
-            value={apiKeyInput}
-            onChange={e => setApiKeyInput(e.target.value)}
-            placeholder="..."
-            className="flex-1 py-1.5"
-          />
-          </div>
-        </FormField>
-      )}
+      <FormField label={<span>{t('anthropic.baseUrl')} <span className="font-normal text-muted/70">({t('anthropic.baseUrlDesc')})</span></span>} compact>
+        <Input type="text" value={baseUrlInput} onChange={e => setBaseUrlInput(e.target.value)}
+          placeholder={t('anthropic.baseUrlPlaceholder')} className="py-1.5" />
+      </FormField>
 
-      {isConfigured && (
-        <FormField label={t('chat.apiKey')} compact>
-          <div className="flex items-center gap-2">
-          <Input
-            type="password"
-            value={apiKeyInput}
-            onChange={e => setApiKeyInput(e.target.value)}
-            placeholder="••••••••"
-            className="flex-1 py-1.5"
-          />
-          </div>
-        </FormField>
+      {hasChanges && (
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={handleSave} disabled={saving}
+            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0">
+            {saving ? '...' : t('settings.save')}
+          </button>
+        </div>
       )}
+      <ProviderConnectionError
+        testResult={testResult}
+        label={getProviderConnectionFailedLabel(t, 'mimo')}
+        as="span"
+      />
+
+      {message && <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>{message.text}</p>}
+    </CollapsibleCardWrapper>
+  )
+}
+
+type StoredCustomProvider = {
+  id: string
+  name: string
+  baseUrl: string
+  models: string[]
+  apiFormat: CustomApiFormat
+  configured: boolean
+}
+
+function CustomCard({
+  t,
+  onSaved,
+}: {
+  t: TFunc
+  onSaved: () => void
+}) {
+  return (
+    <CollapsibleCardWrapper
+      header={<>
+        <span className="shrink-0 text-accent">
+          <Puzzle size={14} />
+        </span>
+        <span className="text-sm font-medium text-text">{t('provider.custom')}</span>
+        <span className="text-xs text-muted truncate">{t('custom.addProvider')}</span>
+      </>}
+    >
+      <CustomProviderAddForm t={t} onSaved={onSaved} />
+    </CollapsibleCardWrapper>
+  )
+}
+
+type CustomProviderFormMode = 'add' | 'edit'
+
+function CustomProviderForm({
+  t,
+  mode,
+  provider,
+  open = true,
+  onSaved,
+  onClose,
+  renderActions,
+}: {
+  t: TFunc
+  mode: CustomProviderFormMode
+  provider?: StoredCustomProvider | null
+  open?: boolean
+  onSaved: () => void
+  onClose?: () => void
+  renderActions?: (opts: { saving: boolean; handleSave: () => void }) => React.ReactNode
+}) {
+  const isEditing = mode === 'edit'
+  const [nameInput, setNameInput] = useState('')
+  const [baseUrlInput, setBaseUrlInput] = useState('')
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [apiFormat, setApiFormat] = useState<CustomApiFormat>('openai')
+  const [manualModelInput, setManualModelInput] = useState('')
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [enabledModels, setEnabledModels] = useState<string[]>([])
+  const [modelSearch, setModelSearch] = useState('')
+  const [fetching, setFetching] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const prevOpen = useRef(false)
+
+  function showMessage(text: string, type: 'success' | 'error') {
+    setMessage({ text, type })
+    setTimeout(() => setMessage(null), 4000)
+  }
+
+  const resetAddForm = useCallback(() => {
+    setNameInput('')
+    setBaseUrlInput('')
+    setApiKeyInput('')
+    setApiFormat('openai')
+    setManualModelInput('')
+    setAvailableModels([])
+    setEnabledModels([])
+    setModelSearch('')
+  }, [])
+
+  const loadEditForm = useCallback((nextProvider: StoredCustomProvider | null) => {
+    setNameInput(nextProvider?.name || '')
+    setBaseUrlInput(nextProvider?.baseUrl || '')
+    setApiKeyInput('')
+    setApiFormat(nextProvider?.apiFormat || 'openai')
+    setManualModelInput('')
+    setModelSearch('')
+    setMessage(null)
+    const models = nextProvider?.models || []
+    setAvailableModels(models)
+    setEnabledModels(models)
+  }, [])
+
+  useEffect(() => {
+    if (!isEditing) {
+      if (!prevOpen.current) {
+        resetAddForm()
+        prevOpen.current = true
+      }
+      return
+    }
+
+    if (!open) {
+      prevOpen.current = false
+      return
+    }
+
+    if (!prevOpen.current) {
+      loadEditForm(provider ?? null)
+      prevOpen.current = true
+    }
+  }, [isEditing, open, provider, resetAddForm, loadEditForm])
+
+  const normalizedUrl = baseUrlInput.trim()
+
+  const handleFetchModels = useCallback(async () => {
+    if (fetching || !normalizedUrl) return
+    setFetching(true)
+    try {
+      const res = await apiPost('/api/settings/custom/models/preview', {
+        providerId: isEditing ? provider?.id || null : null,
+        baseUrl: normalizedUrl,
+        apiKey: apiKeyInput.trim(),
+        apiFormat,
+      }) as { models: Array<{ name: string }> }
+      const fetched = (res.models || []).map(m => m.name).filter(Boolean)
+      setAvailableModels(prev => mergeModels(fetched, prev))
+      setEnabledModels(prev => mergeModels(fetched, prev))
+      if (!fetched.length) showMessage(t('custom.noModels'), 'error')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Fetch failed', 'error')
+    } finally {
+      setFetching(false)
+    }
+  }, [fetching, normalizedUrl, apiFormat, apiKeyInput, isEditing, provider?.id, t])
+
+  const handleAddManualModel = useCallback(() => {
+    const model = manualModelInput.trim()
+    if (!model) return
+    setAvailableModels(prev => mergeModels([model], prev))
+    setEnabledModels(prev => mergeModels([model], prev))
+    setManualModelInput('')
+  }, [manualModelInput])
+
+  function toggleModel(name: string) {
+    setEnabledModels(prev =>
+      prev.includes(name) ? prev.filter(m => m !== name) : [...prev, name],
+    )
+  }
+
+  const sortedModels = useMemo(() => {
+    const enabled = availableModels.filter(m => enabledModels.includes(m))
+    const disabled = availableModels.filter(m => !enabledModels.includes(m))
+    return [...enabled, ...disabled]
+  }, [availableModels, enabledModels])
+
+  const filteredModels = useMemo(
+    () => modelSearch ? sortedModels.filter(m => m.toLowerCase().includes(modelSearch.toLowerCase())) : sortedModels,
+    [sortedModels, modelSearch],
+  )
+
+  const handleSelectAllModels = useCallback(() => {
+    setEnabledModels(prev => {
+      const set = new Set(prev)
+      filteredModels.forEach(model => {
+        set.add(model)
+      })
+      return Array.from(set)
+    })
+  }, [filteredModels])
+
+  const handleClearModels = useCallback(() => {
+    if (!filteredModels.length) return
+    setEnabledModels(prev => prev.filter(model => !filteredModels.includes(model)))
+  }, [filteredModels])
+
+  const handleSave = useCallback(async () => {
+    if (saving) return
+    if (!nameInput.trim()) { showMessage(t('custom.requiredFields'), 'error'); return }
+    if (!normalizedUrl) { showMessage(t('custom.requiredFields'), 'error'); return }
+    if (!isEditing && !apiKeyInput.trim()) { showMessage(t('custom.requiredFields'), 'error'); return }
+    if (!enabledModels.length) { showMessage(t('custom.requiredFields'), 'error'); return }
+    setSaving(true)
+    try {
+      const payload = {
+        providerId: isEditing ? provider?.id || null : null,
+        name: nameInput.trim(),
+        baseUrl: normalizedUrl,
+        apiKey: isEditing ? apiKeyInput.trim() || undefined : apiKeyInput.trim(),
+        apiFormat,
+        models: enabledModels,
+      } as {
+        providerId: string | null
+        name: string
+        baseUrl: string
+        apiKey?: string
+        apiFormat: CustomApiFormat
+        models: string[]
+      }
+      const result = await apiPost('/api/settings/custom-providers', payload) as { provider?: { id: string } }
+      onSaved()
+      if (!isEditing) {
+        resetAddForm()
+        showMessage(t('custom.connected'), 'success')
+      } else if (result?.provider?.id) {
+        void fetcher(`/api/settings/custom-providers/${result.provider.id}/status`)
+        onClose?.()
+      }
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+    }, [saving, isEditing, provider?.id, nameInput, normalizedUrl, apiFormat, enabledModels, apiKeyInput, onSaved, onClose, t, resetAddForm])
+
+  const apiKeyPlaceholder = isEditing ? '••••••••' : 'your-api-key'
+
+  return (
+    <div className="space-y-2.5">
+      <FormField label={t('custom.providerName')} compact>
+        <Input
+          type="text"
+          value={nameInput}
+          onChange={e => setNameInput(e.target.value)}
+          placeholder={t('custom.providerNamePlaceholder')}
+          className="py-1.5"
+        />
+      </FormField>
+
+      <FormField label={t('custom.baseUrl')} compact>
+        <Input
+          type="text"
+          value={baseUrlInput}
+          onChange={e => setBaseUrlInput(e.target.value)}
+          placeholder="https://api.example.com/v1"
+          className="py-1.5"
+        />
+      </FormField>
+
+      <FormField label={t('custom.apiKey')} compact>
+        <Input
+          type="password"
+          value={apiKeyInput}
+          onChange={e => setApiKeyInput(e.target.value)}
+          placeholder={apiKeyPlaceholder}
+          className="py-1.5"
+        />
+      </FormField>
+
+      <FormField label={t('custom.apiFormat')} compact>
+        <select
+          value={apiFormat}
+          onChange={e => setApiFormat(e.target.value as CustomApiFormat)}
+          className="w-full h-9 px-3 rounded-lg border border-border bg-bg-subtle text-xs text-text"
+        >
+          <option value="openai">{t('custom.apiFormatOpenAI')}</option>
+          <option value="anthropic">{t('custom.apiFormatAnthropic')}</option>
+        </select>
+      </FormField>
 
       <div>
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen(!advancedOpen)}
-          className="flex items-center gap-1 text-[11px] text-muted hover:text-text transition-colors select-none"
-        >
-          <ChevronDown size={12} className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
-          {t('anthropic.advanced')}
-        </button>
-        {advancedOpen && (
-          <div className="mt-1.5">
-            <FormField label={t('anthropic.baseUrl')} hint={t('anthropic.baseUrlDesc')} compact>
-              <Input
-                type="text"
-                value={baseUrlInput}
-                onChange={e => setBaseUrlInput(e.target.value)}
-                placeholder={t('anthropic.baseUrlPlaceholder')}
-                className="py-1.5"
-              />
-            </FormField>
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-text select-none">{t('custom.availableModels')}</span>
+            {availableModels.length > 0 && (
+              <span className="text-[10px] text-muted select-none">
+                {t('custom.showingModels', { count: String(filteredModels.length) })}
+              </span>
+            )}
           </div>
-        )}
-      </div>
+          <button
+            type="button"
+            onClick={handleFetchModels}
+            disabled={!normalizedUrl || fetching}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+          >
+            <Download size={11} />
+            {fetching ? t('custom.fetchingModels') : t('custom.fetchModels')}
+          </button>
+        </div>
 
-      {(hasChanges || isConfigured) && (
-        <div className="flex items-center gap-2">
-          {hasChanges && (
+        <div className="flex flex-col gap-2 mb-1.5 sm:flex-row">
+          <div className="relative flex-1">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+            <Input
+              type="text"
+              value={modelSearch}
+              onChange={e => setModelSearch(e.target.value)}
+              placeholder={t('custom.searchModels')}
+              className="pl-7 py-1.5 text-xs"
+            />
+          </div>
+          <div className="flex gap-1">
+            <Input
+              type="text"
+              value={manualModelInput}
+              onChange={e => setManualModelInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddManualModel() } }}
+              placeholder={t('custom.manualModelPlaceholder')}
+              className="w-full py-1.5 text-xs sm:w-32"
+            />
             <button
               type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
+              onClick={handleAddManualModel}
+              className="px-2 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors shrink-0"
             >
-              {saving ? '...' : t('settings.save')}
+              {t('custom.addModel')}
             </button>
-          )}
-          {isConfigured && (
             <button
               type="button"
-              onClick={handleTest}
-              disabled={testing}
-              className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+              onClick={handleSelectAllModels}
+              disabled={!filteredModels.length}
+              className="px-2 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
             >
-              {testing ? t('mimo.testing') : t('mimo.testConnection')}
+              {t('custom.selectAll')}
             </button>
-          )}
-          {testResult && (
-            <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
-              {testResult.ok
-                ? `${t('mimo.connected')} (${testResult.model_count} models)`
-                : `${t('mimo.connectionFailed')}: ${testResult.error}`}
-            </span>
+            <button
+              type="button"
+              onClick={handleClearModels}
+              disabled={!filteredModels.length}
+              className="px-2 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+            >
+              {t('custom.clearModels')}
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-bg-subtle max-h-48 overflow-y-auto divide-y divide-border">
+          {filteredModels.length === 0 ? (
+            <p className="text-xs text-muted p-3 select-none">{t('custom.noModels')}</p>
+          ) : (
+            filteredModels.map(model => {
+              const enabled = enabledModels.includes(model)
+              return (
+                <label key={model} className="flex items-center gap-2 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={() => toggleModel(model)}
+                    className="w-3.5 h-3.5 shrink-0 rounded border border-border bg-bg-card text-accent focus:ring-accent focus:ring-offset-bg-subtle"
+                  />
+                  <span className="text-xs text-text truncate select-none">{model}</span>
+                </label>
+              )
+            })
           )}
         </div>
-      )}
+      </div>
 
       {message && (
         <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
           {message.text}
         </p>
       )}
+
+      {renderActions?.({ saving, handleSave })}
     </div>
   )
 }
 
-function CustomCard({ t }: { t: TFunc }) {
-  const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
-    '/api/settings/preferences',
-    fetcher,
-    { revalidateOnFocus: false },
+function CustomProviderAddForm({ t, onSaved }: { t: TFunc; onSaved: () => void }) {
+  return (
+    <CustomProviderForm
+      mode="add"
+      t={t}
+      onSaved={onSaved}
+      renderActions={({ saving, handleSave }) => (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1.5 text-sm rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {saving ? t('settings.saving') : t('settings.save')}
+          </button>
+        </div>
+      )}
+    />
   )
-  const { data: keyStatus, mutate: mutateKeyStatus } = useSWR<{ configured: boolean }>(
-    '/api/settings/api-keys/custom',
-    fetcher,
-    { revalidateOnFocus: false },
-  )
+}
 
-  const savedBaseUrl = prefs?.['custom.base_url'] || ''
-  const savedName = prefs?.['custom.name'] || ''
-  const isConfigured = keyStatus?.configured
-
-  const [baseUrlInput, setBaseUrlInput] = useState('')
-  const [apiKeyInput, setApiKeyInput] = useState('')
-  const [nameInput, setNameInput] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+function CustomProviderCard({
+  provider,
+  t,
+  onSaved,
+}: {
+  provider: StoredCustomProvider
+  t: TFunc
+  onSaved: () => void
+}) {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; model_count?: number; error?: string } | null>(null)
-
-  const [initialized, setInitialized] = useState(false)
-  useEffect(() => {
-    if (!prefs || initialized) return
-    setBaseUrlInput(prefs['custom.base_url'] || '')
-    setNameInput(prefs['custom.name'] || '')
-    setInitialized(true)
-  }, [prefs, initialized])
-
-  function showMessage(text: string, type: 'success' | 'error') {
-    setMessage({ text, type })
-    setTimeout(() => setMessage(null), 3000)
-  }
-
-  const handleSave = useCallback(async () => {
-    if (saving) return
-    setSaving(true)
-    try {
-      const promises: Promise<any>[] = [
-        apiPatch('/api/settings/preferences', {
-          'custom.base_url': baseUrlInput || '',
-          'custom.name': nameInput || '',
-        }),
-      ]
-      if (apiKeyInput) {
-        promises.push(apiPost('/api/settings/api-keys/custom', { apiKey: apiKeyInput }))
-      }
-      await Promise.all(promises)
-      void mutatePrefs()
-      void mutateKeyStatus()
-      setApiKeyInput('')
-      showMessage(t('custom.settingsSaved'), 'success')
-    } catch (err: unknown) {
-      showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
-    } finally {
-      setSaving(false)
-    }
-  }, [saving, baseUrlInput, apiKeyInput, nameInput, mutatePrefs, mutateKeyStatus, t])
-
-  const handleDeleteKey = useCallback(async () => {
-    if (saving) return
-    setSaving(true)
-    try {
-      await apiPost('/api/settings/api-keys/custom', { apiKey: '' })
-      void mutateKeyStatus()
-      showMessage(t('custom.apiKeyDeleted'), 'success')
-    } catch (err: unknown) {
-      showMessage(err instanceof Error ? err.message : 'Delete failed', 'error')
-    } finally {
-      setSaving(false)
-    }
-  }, [saving, mutateKeyStatus, t])
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const handleTest = useCallback(async () => {
     if (testing) return
     setTesting(true)
     setTestResult(null)
     try {
-      const res = await fetcher('/api/settings/custom/status') as { ok: boolean; model_count?: number; error?: string }
+      const res = await fetcher(`/api/settings/custom-providers/${provider.id}/status`) as { ok: boolean; model_count?: number; error?: string }
       setTestResult(res)
     } catch {
       setTestResult({ ok: false, error: 'Request failed' })
     } finally {
       setTesting(false)
     }
-  }, [testing])
+  }, [testing, provider.id])
 
-  const hasChanges = baseUrlInput !== savedBaseUrl || nameInput !== savedName || !!apiKeyInput
+  useEffect(() => {
+    void handleTest()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const isConfigured = provider.configured
+  const statusDotClass = !isConfigured
+    ? 'bg-error'
+    : testResult?.ok
+      ? 'bg-success'
+      : testResult
+        ? 'bg-error'
+        : 'bg-muted'
+  const statusText = getCustomProviderStatusText(t, isConfigured, testResult, provider.models.length)
+
+  async function handleDeleteConfirmed() {
+    setIsDeleteDialogOpen(false)
+    setDeleting(true)
+    try {
+      await apiDelete(`/api/settings/custom-providers/${provider.id}`)
+      onSaved()
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
-    <div className="p-3 rounded-lg bg-bg-card border border-border min-h-[3rem] space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${testResult?.ok ? 'bg-success' : savedBaseUrl ? 'bg-warning' : 'bg-muted'}`} />
-          <span className="text-sm font-medium text-text select-none">{t('provider.custom')}</span>
+    <>
+      <CollapsibleCardWrapper
+        header={<>
+          <span className={`w-2 h-2 rounded-full shrink-0 ${statusDotClass}`} />
+        <span className="text-sm font-medium text-text truncate">{provider.name}</span>
+        <span className="text-xs text-muted truncate">{statusText}</span>
+        </>}
+        actions={<>
+          <IconBtn
+            onClick={handleTest}
+            disabled={testing}
+            className="p-1 text-muted hover:text-text transition-colors disabled:opacity-50 select-none"
+            title={t('custom.testConnection')}
+          >
+            <Zap size={13} className={testing ? 'animate-pulse' : ''} />
+          </IconBtn>
+          <IconBtn
+            onClick={() => setIsDialogOpen(true)}
+            title={t('custom.editProvider')}
+            className="p-1 text-muted hover:text-text transition-colors select-none"
+          >
+            <Pencil size={13} />
+          </IconBtn>
+          <IconBtn
+            onClick={() => setIsDeleteDialogOpen(true)}
+            disabled={deleting}
+            title={t('custom.deleteProvider')}
+            className="p-1 text-muted/60 hover:text-error transition-colors disabled:opacity-50 select-none"
+          >
+            <Trash2 size={13} />
+          </IconBtn>
+        </>}
+      >
+        <div className="space-y-2 text-xs text-muted">
+          <p className="truncate">{provider.baseUrl}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {provider.models.map(model => (
+              <span key={model} className="rounded-md bg-bg-subtle px-2 py-1 text-[11px] text-muted">
+                {model}
+              </span>
+            ))}
+          </div>
+          <ProviderConnectionError
+            testResult={testResult}
+            label={t('custom.connectionFailed')}
+          />
         </div>
-        {isConfigured && (
-          <button
-            type="button"
-            onClick={handleDeleteKey}
-            disabled={saving}
-            className="px-3 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-          >
-            {t('chat.apiKeyDelete')}
-          </button>
-        )}
-      </div>
-
-      <FormField label={t('custom.baseUrl')} hint={t('custom.baseUrlDesc')} compact>
-        <Input
-          type="text"
-          value={baseUrlInput}
-          onChange={e => setBaseUrlInput(e.target.value)}
-          placeholder={t('custom.baseUrlPlaceholder')}
-          className="py-1.5"
-        />
-      </FormField>
-
-      <FormField label={t('custom.displayName')} hint={t('custom.displayNameDesc')} compact>
-        <Input
-          type="text"
-          value={nameInput}
-          onChange={e => setNameInput(e.target.value)}
-          placeholder={t('custom.displayNamePlaceholder')}
-          className="py-1.5"
-        />
-      </FormField>
-
-      <FormField label={t('chat.apiKey')} compact>
-        <Input
-          type="password"
-          value={apiKeyInput}
-          onChange={e => setApiKeyInput(e.target.value)}
-          placeholder={isConfigured ? '••••••••' : '...'}
-          className="py-1.5"
-        />
-      </FormField>
-
-      <div className="flex items-center gap-2">
-        {hasChanges && (
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
-          >
-            {saving ? '...' : t('settings.save')}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={handleTest}
-          disabled={testing}
-          className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-        >
-          {testing ? t('custom.testing') : t('custom.testConnection')}
-        </button>
-        {testResult && (
-          <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
-            {testResult.ok
-              ? `${t('custom.connected')} (${testResult.model_count} models)`
-              : `${t('custom.connectionFailed')}: ${testResult.error}`}
-          </span>
-        )}
-      </div>
-
-      {message && (
-        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
-          {message.text}
-        </p>
-      )}
-    </div>
+      </CollapsibleCardWrapper>
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-sm border border-border/80">
+          <DialogHeader>
+            <DialogTitle className="text-text">{t('custom.deleteProvider')}</DialogTitle>
+            <DialogDescription className="text-muted">
+              {`${t('custom.deleteConfirm')} "${provider.name}"`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-2">
+            <button
+              type="button"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              className="px-3 py-1.5 text-sm rounded-lg border border-border text-text hover:bg-hover transition-colors"
+            >
+              {t('settings.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={handleDeleteConfirmed}
+              disabled={deleting}
+              className="px-3 py-1.5 text-sm rounded-lg border border-error/50 text-error hover:bg-error/10 transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
+            >
+              {deleting ? t('settings.saving') : t('custom.deleteProvider')}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <CustomProviderDialog
+        open={isDialogOpen}
+        editTarget={provider}
+        t={t}
+        onClose={() => setIsDialogOpen(false)}
+        onSaved={() => { onSaved(); setIsDialogOpen(false) }}
+      />
+    </>
   )
 }
 
-function AnthropicCard({ t }: { t: TFunc }) {
+function CustomProviderDialog({
+  open,
+  editTarget,
+  t,
+  onClose,
+  onSaved,
+}: {
+  open: boolean
+  editTarget: StoredCustomProvider | null
+  t: TFunc
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const isEditing = !!editTarget
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
+      <DialogContent className="max-w-xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{isEditing ? t('custom.editProvider') : t('custom.addProvider')}</DialogTitle>
+          <DialogDescription>{t('custom.addDesc')}</DialogDescription>
+        </DialogHeader>
+
+          <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
+            <CustomProviderForm
+              mode="edit"
+              t={t}
+              provider={editTarget}
+              open={open}
+              onSaved={onSaved}
+              onClose={onClose}
+              renderActions={({ saving, handleSave }) => (
+                <DialogFooter>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-border text-text hover:bg-hover transition-colors"
+                  >
+                    {t('settings.cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-3 py-1.5 text-sm rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    {saving ? t('settings.saving') : t('settings.save')}
+                  </button>
+                </DialogFooter>
+              )}
+            />
+          </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+
+function mergeModels(base: string[], additions: string[]) {
+  const result: string[] = [...base]
+  const exists = new Set(base)
+  additions.forEach(item => {
+    const model = item.trim()
+    if (!model) return
+    if (exists.has(model)) return
+    result.push(model)
+    exists.add(model)
+  })
+  return result
+}
+
+function getCustomProviderStatusText(
+  t: TFunc,
+  isConfigured: boolean,
+  testResult: { ok: boolean } | null,
+  modelCount: number,
+) {
+  if (!isConfigured) return t('chat.apiKeyNotSet')
+  if (testResult && !testResult.ok) return ''
+  return `${t('custom.connected')} (${modelCount} models)`
+}
+
+function AnthropicCard({
+  t,
+  onHideProvider,
+  isHidable,
+}: {
+  t: TFunc
+  onHideProvider?: (provider: string) => void
+  isHidable?: boolean
+}) {
   const { data: keyStatus, mutate: mutateKeyStatus } = useSWR<{ configured: boolean }>(
     '/api/settings/api-keys/anthropic',
     fetcher,
@@ -1319,8 +1870,9 @@ function AnthropicCard({ t }: { t: TFunc }) {
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [baseUrlInput, setBaseUrlInput] = useState('')
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
 
   const [initialized, setInitialized] = useState(false)
   useEffect(() => {
@@ -1329,10 +1881,33 @@ function AnthropicCard({ t }: { t: TFunc }) {
     setInitialized(true)
   }, [prefs, initialized])
 
+  const autoTested = useRef(false)
+  useEffect(() => {
+    if (autoTested.current || isConfigured === undefined) return
+    if (!isConfigured) return
+    autoTested.current = true
+    void handleTest()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConfigured])
+
   function showMessage(text: string, type: 'success' | 'error') {
     setMessage({ text, type })
     setTimeout(() => setMessage(null), 3000)
   }
+
+  const handleTest = useCallback(async () => {
+    if (testing) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetcher('/api/settings/anthropic/status') as { ok: boolean; error?: string }
+      setTestResult(res)
+    } catch {
+      setTestResult({ ok: false, error: 'Request failed' })
+    } finally {
+      setTesting(false)
+    }
+  }, [testing])
 
   async function handleSave() {
     if (saving) return
@@ -1350,6 +1925,7 @@ function AnthropicCard({ t }: { t: TFunc }) {
       void mutatePrefs()
       setApiKeyInput('')
       showMessage(t('anthropic.settingsSaved'), 'success')
+      void handleTest()
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
     } finally {
@@ -1361,9 +1937,15 @@ function AnthropicCard({ t }: { t: TFunc }) {
     if (saving) return
     setSaving(true)
     try {
-      await apiPost('/api/settings/api-keys/anthropic', { apiKey: '' })
+      await Promise.all([
+        apiPost('/api/settings/api-keys/anthropic', { apiKey: '' }),
+        apiPatch('/api/settings/preferences', { 'anthropic.base_url': '' }),
+      ])
       void mutateKeyStatus()
+      void mutatePrefs()
       setApiKeyInput('')
+      setBaseUrlInput('')
+      setTestResult(null)
       showMessage(t('anthropic.apiKeyDeleted'), 'success')
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Delete failed', 'error')
@@ -1373,99 +1955,62 @@ function AnthropicCard({ t }: { t: TFunc }) {
   }
 
   const hasChanges = !!apiKeyInput || baseUrlInput !== savedBaseUrl
+  const dotClass = hasChanges ? 'bg-error' : testResult?.ok ? 'bg-success' : testResult ? 'bg-error' : 'bg-muted'
+  const statusText = getProviderStatusText(t, 'anthropic', !!isConfigured, testResult)
 
   return (
-    <div className="p-3 rounded-lg bg-bg-card border border-border space-y-2 min-h-[3rem]">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full shrink-0 ${isConfigured ? 'bg-success' : 'bg-error'}`} />
-          <span className="text-sm font-medium text-text select-none">{t(PROVIDER_LABELS['anthropic'])}</span>
-          <span className="text-xs text-muted select-none">
-            {isConfigured ? t('chat.apiKeyConfigured') : t('chat.apiKeyNotSet')}
-          </span>
-        </div>
+    <CollapsibleCardWrapper
+      header={<>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+        <span className="text-sm font-medium text-text">{t(PROVIDER_LABELS['anthropic'])}</span>
+        <span className="text-xs text-muted">{statusText}</span>
+      </>}
+      actions={<>
+        <IconBtn onClick={handleTest} disabled={testing}
+          title={t('ollama.testConnection')}
+          className="p-1 text-muted hover:text-text transition-colors disabled:opacity-50">
+          <Zap size={13} className={testing ? 'animate-pulse' : ''} />
+        </IconBtn>
         {isConfigured && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={saving}
-            className="px-3 py-1 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
-          >
-            {t('chat.apiKeyDelete')}
-          </button>
+          <IconBtn onClick={handleDelete} disabled={saving}
+            title={t('chat.apiKeyDelete')} className="p-1 text-muted/60 hover:text-error transition-colors disabled:opacity-50">
+            <RotateCcw size={13} />
+          </IconBtn>
         )}
-      </div>
-
-      {!isConfigured && (
-        <FormField label={t('chat.apiKey')} compact>
-          <div className="flex items-center gap-2">
-          <Input
-            type="password"
-            value={apiKeyInput}
-            onChange={e => setApiKeyInput(e.target.value)}
-            placeholder="sk-ant-..."
-            className="flex-1 py-1.5"
-          />
-          </div>
-        </FormField>
-      )}
-
-      {isConfigured && (
-        <FormField label={t('chat.apiKey')} compact>
-          <div className="flex items-center gap-2">
-          <Input
-            type="password"
-            value={apiKeyInput}
-            onChange={e => setApiKeyInput(e.target.value)}
-            placeholder="••••••••"
-            className="flex-1 py-1.5"
-          />
-          </div>
-        </FormField>
-      )}
-
-      <div>
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen(!advancedOpen)}
-          className="flex items-center gap-1 text-[11px] text-muted hover:text-text transition-colors select-none"
-        >
-          <ChevronDown size={12} className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
-          {t('anthropic.advanced')}
-        </button>
-        {advancedOpen && (
-          <div className="mt-1.5">
-            <FormField label={t('anthropic.baseUrl')} hint={t('anthropic.baseUrlDesc')} compact>
-              <Input
-                type="text"
-                value={baseUrlInput}
-                onChange={e => setBaseUrlInput(e.target.value)}
-                placeholder={t('anthropic.baseUrlPlaceholder')}
-                className="py-1.5"
-              />
-            </FormField>
-          </div>
+        {isHidable && onHideProvider && (
+          <IconBtn onClick={() => onHideProvider('anthropic')}
+            title={t('integration.removeProvider')}
+            className="p-1 text-muted/60 hover:text-muted transition-colors">
+            <EyeOff size={13} />
+          </IconBtn>
         )}
-      </div>
+      </>}
+    >
+      <FormField label={t('chat.apiKey')} compact>
+        <Input type="password" value={apiKeyInput} onChange={e => setApiKeyInput(e.target.value)}
+          placeholder={isConfigured ? '••••••••' : 'sk-ant-...'} className="py-1.5" />
+      </FormField>
+
+      <FormField label={<span>{t('anthropic.baseUrl')} <span className="font-normal text-muted/70">({t('anthropic.baseUrlDesc')})</span></span>} compact>
+        <Input type="text" value={baseUrlInput} onChange={e => setBaseUrlInput(e.target.value)}
+          placeholder={t('anthropic.baseUrlPlaceholder')} className="py-1.5" />
+      </FormField>
 
       {hasChanges && (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
-          >
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={handleSave} disabled={saving}
+            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none">
             {saving ? '...' : t('settings.save')}
           </button>
         </div>
       )}
+      <ProviderConnectionError
+        testResult={testResult}
+        label={getProviderConnectionFailedLabel(t, 'anthropic')}
+        as="span"
+      />
 
-      {message && (
-        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
-          {message.text}
-        </p>
-      )}
-    </div>
+      {message && <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>{message.text}</p>}
+    </CollapsibleCardWrapper>
   )
 }

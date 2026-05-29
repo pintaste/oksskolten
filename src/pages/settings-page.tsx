@@ -25,17 +25,17 @@ export function SettingsPage() {
   const navigate = useNavigate()
 
   return (
-    <div className="bg-bg">
-      <div className="max-w-5xl mx-auto px-4 pt-6 md:pt-8">
+    <div className="bg-bg min-h-full">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 md:pt-8">
         <h1 className="text-2xl font-bold text-text mb-4 select-none">{t('settings.title')}</h1>
       </div>
-      <div className="max-w-5xl mx-auto flex flex-col md:flex-row">
-        <nav className="flex gap-1 px-4 py-2 select-none md:hidden overflow-x-auto">
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row">
+        <nav className="flex gap-1 px-4 sm:px-6 py-2 select-none md:hidden overflow-x-auto">
           {TABS.map(key => (
             <button
               key={key}
               onClick={() => navigate(`/settings/${key}`)}
-              className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm rounded-lg ${
+              className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-sm rounded-[10px] transition-colors ${
                 tab === key
                   ? 'bg-hover-sidebar text-accent font-medium'
                   : 'text-muted hover:bg-hover-sidebar hover:text-text'
@@ -46,12 +46,12 @@ export function SettingsPage() {
           ))}
         </nav>
 
-        <nav className="hidden md:block md:w-44 shrink-0 px-4 py-4 select-none space-y-1.5">
+        <nav className="hidden md:block md:w-56 shrink-0 px-6 py-4 select-none space-y-1">
           {TABS.map(key => (
             <button
               key={key}
               onClick={() => navigate(`/settings/${key}`)}
-              className={`w-full text-left px-3 py-1.5 text-sm rounded-lg ${
+              className={`w-full text-left px-3.5 py-2 text-sm rounded-[10px] transition-colors ${
                 tab === key
                   ? 'bg-hover-sidebar text-accent font-medium'
                   : 'text-muted hover:bg-hover-sidebar hover:text-text'
@@ -62,7 +62,7 @@ export function SettingsPage() {
           ))}
         </nav>
 
-        <main className="flex-1 px-4 md:px-6 pt-4 md:pt-6 pb-32 space-y-8">
+        <main className="flex-1 min-w-0 px-4 sm:px-6 md:px-8 pt-4 md:pt-6 pb-32 space-y-10">
           {tab === 'viewer' && (
             <div className="flex flex-col items-center justify-center py-16 text-muted select-none">
               <Construction size={40} strokeWidth={1.5} className="mb-3 text-muted" />
