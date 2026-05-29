@@ -143,6 +143,7 @@ export async function demoFetcher(url: string): Promise<unknown> {
       'translate.provider': 'deepl',
       'translate.model': '',
       'translate.target_lang': null,
+      'translate.source_lang': null,
     }
   }
 

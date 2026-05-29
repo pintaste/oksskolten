@@ -418,6 +418,39 @@ describe('PATCH /api/settings/preferences — on/off toggles', () => {
     expect(res.statusCode).toBe(400)
   })
 
+  it('accepts translate source/target language prefs', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: {
+        'translate.target_lang': 'en',
+        'translate.source_lang': 'ja',
+      },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()['translate.target_lang']).toBe('en')
+    expect(res.json()['translate.source_lang']).toBe('ja')
+  })
+
+  it('rejects invalid translate source/target language prefs', async () => {
+    const resTarget = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'translate.target_lang': 'fr' },
+    })
+    expect(resTarget.statusCode).toBe(400)
+
+    const resSource = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'translate.source_lang': 'fr' },
+    })
+    expect(resSource.statusCode).toBe(400)
+  })
+
   it('rejects invalid unread_indicator value', async () => {
     const res = await app.inject({
       method: 'PATCH',

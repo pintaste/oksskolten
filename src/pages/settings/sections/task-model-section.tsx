@@ -257,6 +257,38 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
             </div>
           </div>
         </div>
+        <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-center md:gap-5" role="radiogroup" aria-label={t('settings.translateSourceLang')}>
+          <span className="text-xs font-medium text-text select-none shrink-0">
+            {t('settings.translateSourceLang')}
+          </span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 md:flex-1">
+            {([
+              { value: '' as const, label: t('settings.translateSourceLangAuto') },
+              { value: 'ja' as const, label: t('settings.languageJa') },
+              { value: 'en' as const, label: t('settings.languageEn') },
+              { value: 'zh' as const, label: t('settings.languageZh') },
+            ]).map(opt => {
+              const selected = (settings.translateSourceLang || '') === opt.value
+            return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => settings.setTranslateSourceLang(opt.value)}
+                  className={`flex min-w-fit h-7 items-center gap-2 rounded-md px-2 py-0.5 text-xs font-medium leading-none transition-colors select-none ${
+                    selected ? 'text-text' : 'text-muted hover:text-text'
+                  }`}
+                >
+                  <span className={`relative h-[18px] w-[18px] rounded-full border-2 shrink-0 ${selected ? 'border-accent' : 'border-muted/40'}`}>
+                    {selected && <span className="absolute inset-1 rounded-full bg-accent" />}
+                  </span>
+                  <span className="whitespace-nowrap">{opt.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
         <div className="mt-2 space-y-1.5">
           {tasks.map(task => (
             <TaskModelRow
@@ -693,56 +725,13 @@ function ModelSelect({
     isCustomProvider,
   ])
 
-  // Auto-select first Ollama model when switching to ollama and no model is set
+  // Auto-select first model when a provider is chosen and model is still empty.
+  // Keep persisted/explicit models intact even if they are not currently discoverable.
   useEffect(() => {
-    if (provider === 'ollama' && ollamaModels?.models?.length && !modelValue) {
-      setModel(ollamaModels.models[0].name)
-    }
-  }, [provider, ollamaModels, modelValue, setModel])
-
-  // Auto-select first vLLM model when switching to vllm and no model is set
-  useEffect(() => {
-    if (provider === 'vllm' && vllmModels?.models?.length && !modelValue) {
-      setModel(vllmModels.models[0].name)
-    }
-  }, [provider, vllmModels, modelValue, setModel])
-
-  // Auto-select first DeepSeek model when switching to deepseek and no model is set
-  useEffect(() => {
-    if (provider === 'deepseek' && deepseekModels?.models?.length && !modelValue) {
-      setModel(deepseekModels.models[0].name)
-    }
-  }, [provider, deepseekModels, modelValue, setModel])
-
-  // Auto-select first Mimo model when switching to mimo and no model is set
-  useEffect(() => {
-    if (provider === 'mimo' && mimoModels?.models?.length && !modelValue) {
-      setModel(mimoModels.models[0].name)
-    }
-  }, [provider, mimoModels, modelValue, setModel])
-
-  useEffect(() => {
-    if (!provider) return
-    if (availableModelValues === undefined || availableModelValues.length === 0) return
-    if (modelValue && !availableModelValues.includes(modelValue)) {
-      setModel(availableModelValues[0])
-    }
+    if (!provider || modelValue) return
+    if (!availableModelValues || availableModelValues.length === 0) return
+    setModel(availableModelValues[0])
   }, [availableModelValues, modelValue, provider, setModel])
-
-  // For custom-* providers, get models from registry
-  // Auto-select first Custom model when switching to custom and no model is set
-  useEffect(() => {
-    if (provider === 'custom' && savedCustomModels.length && !modelValue) {
-      setModel(savedCustomModels[0])
-    }
-  }, [provider, savedCustomModels, modelValue, setModel])
-
-  // Auto-select first model for custom-* providers
-  useEffect(() => {
-    if (customProviderModels && customProviderModels.length && !modelValue) {
-      setModel(customProviderModels[0])
-    }
-  }, [customProviderModels, modelValue, setModel])
 
   if (!provider) {
     return (

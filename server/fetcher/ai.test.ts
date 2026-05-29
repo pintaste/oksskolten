@@ -203,6 +203,21 @@ describe('translateArticle', () => {
     expect(params.messages[0].content).toContain('Translate the following article into English')
   })
 
+  it('passes configured source language in translate prompt', async () => {
+    mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
+    mockGetSetting.mockImplementation((key: string) => {
+      if (key === 'translate.target_lang') return 'en'
+      if (key === 'translate.source_lang') return 'ja'
+      if (key === 'general.language') return 'en'
+      return null
+    })
+
+    await translateArticle('Content to translate')
+
+    const params = mockCreateMessage.mock.calls[0][0]
+    expect(params.messages[0].content).toContain('Translate the following article from Japanese into English')
+  })
+
   it('sets maxTokens to 16384 for translate', async () => {
     mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
     await translateArticle('text')

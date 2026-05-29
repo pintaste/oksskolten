@@ -353,6 +353,9 @@ const dict = {
   'settings.translateTargetLang': { ja: '翻訳先言語', en: 'Translation language', zh: '翻译目标语言'},
   'settings.translateTargetLangDesc': { ja: '記事をどの言語に翻訳するか', en: 'Language to translate articles into', zh: '将文章翻译为哪种语言'},
   'settings.translateTargetLangAuto': { ja: 'UI言語と同じ', en: 'Same as UI language', zh: '与界面语言相同'},
+  'settings.translateSourceLang': { ja: '翻訳元言語', en: 'Source language', zh: '翻译源语言'},
+  'settings.translateSourceLangDesc': { ja: '記事の元言語を指定する。空の場合は自動判定', en: 'Optional source language for translation. If left unset, translation is auto-detected', zh: '可选的源语言，未设置时自动检测'},
+  'settings.translateSourceLangAuto': { ja: '自動判定', en: 'Auto detect', zh: '自动检测' },
 
   // Data (OPML)
   'settings.data': { ja: 'データ', en: 'Data', zh: '数据'},

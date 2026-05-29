@@ -87,6 +87,17 @@ describe('deeplTranslate', () => {
     expect(body.ignore_tags).toEqual(['code', 'pre', 'img'])
   })
 
+  it('passes source language when provided', async () => {
+    setupApiKey('deepl-key:fx')
+    mockDeeplResponse('<p>こんにちは世界</p>')
+
+    await deeplTranslate('Hello world', 'ja', 'zh')
+
+    const [, opts] = mockFetch.mock.calls[0]
+    const body = JSON.parse(opts.body)
+    expect(body.source_lang).toBe('ZH')
+  })
+
   it('uses Pro API URL for non-free keys', async () => {
     setupApiKey('deepl-pro-key-xxx')
     mockDeeplResponse('<p>翻訳</p>')

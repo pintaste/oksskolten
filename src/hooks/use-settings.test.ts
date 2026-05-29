@@ -127,6 +127,8 @@ describe('useSettings', () => {
     expect(result.current).toHaveProperty('indicatorStyle')
     expect(result.current).toHaveProperty('summaryAuto')
     expect(result.current).toHaveProperty('setSummaryAuto')
+    expect(result.current).toHaveProperty('translateSourceLang')
+    expect(result.current).toHaveProperty('setTranslateSourceLang')
   })
 
   it('hydrates theme from DB prefs', () => {
@@ -181,6 +183,31 @@ describe('useSettings', () => {
     const { result } = renderHook(() => useSettings())
 
     expect(result.current.summaryAuto).toBe('on')
+  })
+
+  it('hydrates translate.source_lang from DB prefs', () => {
+    swrData = {
+      'appearance.color_theme': null,
+      'reading.date_mode': null,
+      'reading.auto_mark_read': null,
+      'reading.unread_indicator': null,
+      'reading.internal_links': null,
+      'appearance.highlight_theme': null,
+      'summary.auto': null,
+      'summary.provider': null,
+      'summary.model': null,
+      'translate.provider': null,
+      'translate.model': null,
+      'translate.target_lang': null,
+      'translate.source_lang': 'ja',
+      'chat.provider': null,
+      'chat.model': null,
+      'custom_themes': null,
+    }
+
+    const { result } = renderHook(() => useSettings())
+
+    expect(result.current.translateSourceLang).toBe('ja')
   })
 
   it('sends backfill PATCH for unset prefs', async () => {

@@ -49,6 +49,7 @@ interface Prefs {
   'translate.provider': string | null
   'translate.model': string | null
   'translate.target_lang': string | null
+  'translate.source_lang': string | null
   'custom_themes': string | null
 }
 
@@ -86,6 +87,7 @@ export function useSettings() {
   const [translateProvider, setTranslateProviderState] = useState<string | null>(null)
   const [translateModel, setTranslateModelState] = useState<string | null>(null)
   const [translateTargetLang, setTranslateTargetLangState] = useState<string | null>(null)
+  const [translateSourceLang, setTranslateSourceLangState] = useState<string | null>(null)
 
   // --- DB sync ---
   const { data: prefs } = useSWR<Prefs>(
@@ -178,6 +180,7 @@ export function useSettings() {
       { key: 'translate.provider', setter: setTranslateProviderState },
       { key: 'translate.model', setter: setTranslateModelState },
       { key: 'translate.target_lang', setter: setTranslateTargetLangState },
+      { key: 'translate.source_lang', setter: setTranslateSourceLangState },
     ]
 
     for (const { key, setter, backfillRef, validate } of hydrationMap) {
@@ -277,6 +280,7 @@ export function useSettings() {
     syncedSetTranslateProvider,
     syncedSetTranslateModel,
     syncedSetTranslateTargetLang,
+    syncedSetTranslateSourceLang,
   } = useMemo(() => {
     const make = <T extends string>(key: keyof Prefs, setter: (v: T) => void) =>
       (value: T) => {
@@ -307,6 +311,7 @@ export function useSettings() {
       syncedSetTranslateProvider: make<string>('translate.provider', setTranslateProviderState),
       syncedSetTranslateModel: make<string>('translate.model', setTranslateModelState),
       syncedSetTranslateTargetLang: make<string>('translate.target_lang', setTranslateTargetLangState),
+      syncedSetTranslateSourceLang: make<string>('translate.source_lang', setTranslateSourceLangState),
     }
     // scheduleSave and dirtyKeysRef are stable refs; remaining setters are useState/useCallback-stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -405,6 +410,8 @@ export function useSettings() {
     setTranslateModel: syncedSetTranslateModel,
     translateTargetLang,
     setTranslateTargetLang: syncedSetTranslateTargetLang,
+    translateSourceLang,
+    setTranslateSourceLang: syncedSetTranslateSourceLang,
     keyboardNavigation,
     setKeyboardNavigation: syncedSetKeyboardNavigation,
     keybindings,

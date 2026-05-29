@@ -25,6 +25,7 @@ function getApiUrl(apiKey: string): string {
 export async function deeplTranslate(
   text: string,
   targetLang: string,
+  sourceLang?: string | null,
 ): Promise<{ translatedText: string; characters: number; monthlyChars: number }> {
   const apiKey = requireDeeplKey()
   const apiUrl = getApiUrl(apiKey)
@@ -42,6 +43,7 @@ export async function deeplTranslate(
         body: JSON.stringify({
           text: [chunk],
           target_lang: targetLang.toUpperCase(),
+          ...(sourceLang ? { source_lang: sourceLang.toUpperCase() } : {}),
           tag_handling: 'xml',
           ignore_tags: ['code', 'pre', 'img'],
         }),

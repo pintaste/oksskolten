@@ -19,6 +19,7 @@ export function requireGoogleTranslateKey(): string {
 export async function googleTranslate(
   text: string,
   targetLang: string,
+  sourceLang?: string | null,
 ): Promise<{ translatedText: string; characters: number; monthlyChars: number }> {
   const apiKey = requireGoogleTranslateKey()
 
@@ -32,6 +33,7 @@ export async function googleTranslate(
         body: JSON.stringify({
           q: chunk,
           target: targetLang,
+          ...(sourceLang ? { source: sourceLang } : {}),
           format: 'html',
         }),
       })

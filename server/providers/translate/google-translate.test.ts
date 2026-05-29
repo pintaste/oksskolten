@@ -88,6 +88,17 @@ describe('googleTranslate', () => {
     expect(body.format).toBe('html')
   })
 
+  it('passes source language when provided', async () => {
+    setupApiKey()
+    mockTranslateResponse('<p>こんにちは世界</p>')
+
+    await googleTranslate('Hello world', 'ja', 'zh')
+
+    const [, opts] = mockFetch.mock.calls[0]
+    const body = JSON.parse(opts.body)
+    expect(body.source).toBe('zh')
+  })
+
   it('preserves inline code through translation', async () => {
     setupApiKey()
     // marked converts `console.log` to <code>console.log</code> inside <p>

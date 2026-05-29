@@ -43,9 +43,11 @@ ${fullText}`
 }
 
 function buildTranslatePrompt(fullText: string): string {
-  const lang = getSetting('translate.target_lang') || getSetting('general.language') || DEFAULT_LANGUAGE
-  const targetLang = languageName(lang)
-  return `Translate the following article into ${targetLang}.
+  const target = getTargetLang()
+  const source = getSetting('translate.source_lang') || null
+  const sourceLang = source && source !== target ? ` from ${languageName(source)}` : ''
+  const targetLang = languageName(target)
+  return `Translate the following article${sourceLang} into ${targetLang}.
 Translate every word faithfully — do not summarize, compress, or omit anything.
 The translation must be 1:1 with the original text in volume.
 Preserve Markdown formatting. In particular, keep blockquote lines starting with ">".
@@ -159,7 +161,9 @@ function getTargetLang(): string {
 }
 
 async function runGoogleTranslate(fullText: string): Promise<{ fullTextTranslated: string } & AiTextResult> {
-  const result = await googleTranslate(fullText, getTargetLang())
+  const targetLang = getTargetLang()
+  const sourceLang = getSetting('translate.source_lang') || null
+  const result = await googleTranslate(fullText, targetLang, sourceLang)
   return {
     fullTextTranslated: result.translatedText,
     inputTokens: result.characters,
@@ -171,7 +175,9 @@ async function runGoogleTranslate(fullText: string): Promise<{ fullTextTranslate
 }
 
 async function runDeepl(fullText: string): Promise<{ fullTextTranslated: string } & AiTextResult> {
-  const result = await deeplTranslate(fullText, getTargetLang())
+  const targetLang = getTargetLang()
+  const sourceLang = getSetting('translate.source_lang') || null
+  const result = await deeplTranslate(fullText, targetLang, sourceLang)
   return {
     fullTextTranslated: result.translatedText,
     inputTokens: result.characters,
