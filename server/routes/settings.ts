@@ -9,7 +9,7 @@ import {
   getDb,
 } from '../db.js'
 import { requireJson, getAuthUser } from '../auth.js'
-import { getAllModelValues, getModelValues } from '../../shared/models.js'
+import { getModelValues } from '../../shared/models.js'
 import {
   getStoredCustomProviders,
   getCustomProviderModels,
@@ -97,12 +97,12 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'appearance.font_family': null,
   'appearance.list_layout': ['list', 'card', 'magazine', 'compact'],
   'chat.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'deepseek', 'mimo', 'custom'],
-  'chat.model': getAllModelValues(),
+  'chat.model': null,
   'summary.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'deepseek', 'mimo', 'custom'],
-  'summary.model': getAllModelValues(),
+  'summary.model': null,
   'summary.auto': ['on', 'off'],
   'translate.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'google-translate', 'deepl', 'deepseek', 'mimo', 'custom'],
-  'translate.model': getAllModelValues(),
+  'translate.model': null,
   'translate.target_lang': ['ja', 'en', 'zh'],
   'ollama.base_url': null,
   'ollama.custom_headers': null,

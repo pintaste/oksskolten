@@ -191,6 +191,42 @@ describe('PATCH /api/settings/preferences — provider-model validation', () => 
     expect(res.json().error).toMatch(/not valid for provider/)
   })
 
+  it('accepts dynamic models for DeepSeek provider', async () => {
+    const deepseekPairs: Array<[string, string]> = [
+      ['chat.provider', 'chat.model'],
+      ['summary.provider', 'summary.model'],
+      ['translate.provider', 'translate.model'],
+    ]
+    for (const [providerKey, modelKey] of deepseekPairs) {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/api/settings/preferences',
+        headers: json,
+        payload: {
+          [providerKey]: 'deepseek',
+          [modelKey]: 'deepseek-v4-pro',
+        },
+      })
+      expect(res.statusCode).toBe(200)
+      expect(res.json()[providerKey]).toBe('deepseek')
+      expect(res.json()[modelKey]).toBe('deepseek-v4-pro')
+    }
+  })
+
+  it('accepts arbitrary ollama model name for ollama provider', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: {
+        'summary.provider': 'ollama',
+        'summary.model': 'llama3:70b',
+      },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()['summary.model']).toBe('llama3:70b')
+  })
+
   it('skips validation when provider or model is empty', async () => {
     // Only set provider without model — should pass (no model to validate against)
     const res = await app.inject({
