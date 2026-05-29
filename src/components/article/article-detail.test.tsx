@@ -5,11 +5,20 @@ import { SWRConfig } from 'swr'
 import { LocaleContext } from '../../lib/i18n'
 import { TooltipProvider } from '../ui/tooltip'
 
-const { mockApiPatch, mockApiPost, mockTrackRead, mockQueueSeenIds } = vi.hoisted(() => ({
+const {
+  mockApiPatch,
+  mockApiPost,
+  mockTrackRead,
+  mockQueueSeenIds,
+  mockTranslateHandle,
+  mockUseTranslate,
+} = vi.hoisted(() => ({
   mockApiPatch: vi.fn(),
   mockApiPost: vi.fn(() => Promise.resolve()),
   mockTrackRead: vi.fn(),
   mockQueueSeenIds: vi.fn((_ids: number[]) => Promise.resolve()),
+  mockTranslateHandle: vi.fn(),
+  mockUseTranslate: vi.fn(),
 }))
 
 vi.mock('../../lib/fetcher', async () => {
@@ -49,16 +58,18 @@ vi.mock('../../hooks/use-summarize', () => ({
   }),
 }))
 
-const mockUseTranslate = vi.fn((_article?: { id: number; full_text_translated: string | null }, _metrics?: unknown) => ({
+const createMockUseTranslate = (_article?: { id: number; full_text_translated: string | null }, _metrics?: unknown) => ({
   viewMode: 'original' as const,
   setViewMode: vi.fn(),
   translating: false,
   translatingText: '',
   fullTextTranslated: null,
-  handleTranslate: vi.fn(),
+  handleTranslate: mockTranslateHandle,
   translatingHtml: '',
   error: null,
-}))
+})
+
+mockUseTranslate.mockImplementation(createMockUseTranslate)
 
 vi.mock('../../hooks/use-translate', () => ({
   useTranslate: (...args: Parameters<typeof mockUseTranslate>) => mockUseTranslate(...args),
@@ -96,6 +107,14 @@ const mockSettings = {
   setHighlightTheme: vi.fn(),
   articleFont: 'sans' as const,
   setArticleFont: vi.fn(),
+  translateProvider: '' as string,
+  setTranslateProvider: vi.fn(),
+  translateModel: '' as string,
+  setTranslateModel: vi.fn(),
+  translateTargetLang: null as string | null,
+  setTranslateTargetLang: vi.fn(),
+  translateSourceLang: null as string | null,
+  setTranslateSourceLang: vi.fn(),
   save: vi.fn(),
 }
 
@@ -369,5 +388,146 @@ describe('ArticleDetail stale translation filtering', () => {
     expect(mockUseTranslate).toHaveBeenCalled()
     const firstArg = mockUseTranslate.mock.calls[0]![0]
     expect(firstArg).toEqual({ id: 1, full_text_translated: null })
+  })
+})
+
+describe('ArticleDetail immersive translation', () => {
+  const articleUrl = 'https://example.com/posts/1'
+  const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
+
+  beforeEach(() => {
+    mockApiPatch.mockReset()
+    mockApiPost.mockReset()
+    mockApiPost.mockResolvedValue(undefined)
+    mockTrackRead.mockReset()
+    mockQueueSeenIds.mockClear()
+    mockUseTranslate.mockClear()
+    mockTranslateHandle.mockReset()
+    mockSettings.translateProvider = '' as string
+    mockSettings.translateModel = '' as string
+    mockSettings.translateTargetLang = null
+    mockSettings.translateSourceLang = null
+  })
+
+  it('auto-starts translation for non-user language when provider is configured', async () => {
+    mockSettings.translateProvider = 'anthropic'
+    mockSettings.translateModel = 'claude-sonnet-4-6'
+    mockSettings.translateTargetLang = 'en'
+
+    const article = {
+      id: 1,
+      feed_id: 2,
+      feed_name: 'Example Feed',
+      title: 'Example Article',
+      url: articleUrl,
+      published_at: '2026-03-04T00:00:00.000Z',
+      lang: 'fr',
+      summary: null,
+      full_text: 'Article body',
+      full_text_translated: null,
+      translated_lang: null,
+      seen_at: '2026-03-04T00:00:00.000Z',
+      read_at: '2026-03-04T00:00:00.000Z',
+      bookmarked_at: null,
+      liked_at: null,
+    }
+
+    render(
+      <MemoryRouter>
+        <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="*" element={<ArticleDetail articleUrl={articleUrl} />} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(mockTranslateHandle).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('does not auto-start translation when provider is not configured', () => {
+    const article = {
+      id: 1,
+      feed_id: 2,
+      feed_name: 'Example Feed',
+      title: 'Example Article',
+      url: articleUrl,
+      published_at: '2026-03-04T00:00:00.000Z',
+      lang: 'fr',
+      summary: null,
+      full_text: 'Article body',
+      full_text_translated: null,
+      translated_lang: null,
+      seen_at: '2026-03-04T00:00:00.000Z',
+      read_at: '2026-03-04T00:00:00.000Z',
+      bookmarked_at: null,
+      liked_at: null,
+    }
+
+    render(
+      <MemoryRouter>
+        <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="*" element={<ArticleDetail articleUrl={articleUrl} />} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+
+    expect(mockTranslateHandle).not.toHaveBeenCalled()
+  })
+
+  it('does not auto-start translation when article is already in user language', () => {
+    mockSettings.translateProvider = 'anthropic'
+
+    const article = {
+      id: 1,
+      feed_id: 2,
+      feed_name: 'Example Feed',
+      title: 'Example Article',
+      url: articleUrl,
+      published_at: '2026-03-04T00:00:00.000Z',
+      lang: 'en',
+      summary: null,
+      full_text: 'Article body',
+      full_text_translated: null,
+      translated_lang: null,
+      seen_at: '2026-03-04T00:00:00.000Z',
+      read_at: '2026-03-04T00:00:00.000Z',
+      bookmarked_at: null,
+      liked_at: null,
+    }
+
+    render(
+      <MemoryRouter>
+        <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="*" element={<ArticleDetail articleUrl={articleUrl} />} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+
+    expect(mockTranslateHandle).not.toHaveBeenCalled()
   })
 })
