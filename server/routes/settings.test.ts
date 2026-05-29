@@ -565,7 +565,7 @@ describe('POST /api/settings/api-keys/:provider', () => {
   it('returns 400 for unknown provider', async () => {
     const res = await app.inject({
       method: 'POST',
-      url: '/api/settings/api-keys/deepseek',
+      url: '/api/settings/api-keys/unknown-provider',
       headers: json,
       payload: { apiKey: 'key' },
     })

@@ -1,13 +1,13 @@
 import type { LLMProvider } from './provider.js'
 import { anthropicProvider } from './anthropic.js'
-import { geminiProvider } from './gemini.js'
-import { openaiProvider } from './openai.js'
 import { claudeCodeProvider } from './claude-code.js'
-import { ollamaProvider } from './ollama.js'
-import { vllmProvider } from './vllm.js'
+import { customProvider, getCustomProviderById, isCustomProviderId } from './custom.js'
 import { deepseekProvider } from './deepseek.js'
+import { geminiProvider } from './gemini.js'
 import { mimoProvider } from './mimo.js'
-import { customProvider } from './custom.js'
+import { ollamaProvider } from './ollama.js'
+import { openaiProvider } from './openai.js'
+import { vllmProvider } from './vllm.js'
 
 const providers = new Map<string, LLMProvider>()
 
@@ -22,7 +22,11 @@ providers.set('mimo', mimoProvider)
 providers.set('custom', customProvider)
 
 export function getProvider(name: string): LLMProvider {
+  if (isCustomProviderId(name)) {
+    return getCustomProviderById(name)
+  }
+
   const provider = providers.get(name)
-  if (!provider) throw new Error(`Unknown LLM provider: ${name}`)
-  return provider
+  if (provider) return provider
+  throw new Error(`Unknown LLM provider: ${name}`)
 }

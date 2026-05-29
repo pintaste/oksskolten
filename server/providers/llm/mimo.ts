@@ -16,12 +16,12 @@ export function getMimoBaseUrl(): string {
 
 export function getMimoClient(): OpenAI {
   const apiKey = getMimoApiKey()
-  const baseUrl = getMimoBaseUrl()
-  if (cachedClient && apiKey === cachedApiKey && baseUrl === cachedBaseUrl) return cachedClient
+  const normalizedUrl = getMimoBaseUrl().replace(/\/+$/, '').replace(/\/v1$/, '') + '/v1'
+  if (cachedClient && apiKey === cachedApiKey && normalizedUrl === cachedBaseUrl) return cachedClient
   cachedApiKey = apiKey
-  cachedBaseUrl = baseUrl
+  cachedBaseUrl = normalizedUrl
   cachedClient = new OpenAI({
-    baseURL: baseUrl,
+    baseURL: normalizedUrl,
     apiKey,
   })
   return cachedClient
