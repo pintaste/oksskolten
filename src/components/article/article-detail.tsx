@@ -33,7 +33,7 @@ interface ArticleDetailProps {
 }
 
 export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
-  const { settings: { internalLinks, chatPosition, translateTargetLang } } = useAppLayout()
+  const { settings: { internalLinks, chatPosition, translateProvider, translateModel, translateTargetLang, translateSourceLang } } = useAppLayout()
   const { settings: { summaryAuto } } = useAppLayout()
   const navigate = useNavigate()
   const { t, tError, isKeyNotSetError, locale } = useI18n()
@@ -42,6 +42,8 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
   const { mutate: globalMutate } = useSWRConfig()
 
   const isUserLang = article?.lang === (translateTargetLang || locale)
+  const translateTarget = translateTargetLang || locale
+  const translateSource = translateSourceLang || ''
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
   const articleRef = useRef<HTMLElement>(null)
@@ -59,6 +61,20 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
     [article, isTranslationCurrent],
   )
   const { viewMode, setViewMode, translating, translatingText, fullTextTranslated, handleTranslate, translatingHtml, error: translateError } = useTranslate(translateInput, metrics)
+
+  const autoTranslateKey = useMemo(() => {
+    if (!article || isUserLang || !translateProvider || fullTextTranslated) {
+      return null
+    }
+    return `${article.id}:${translateProvider}:${translateModel || ''}:${translateTarget}:${translateSource}`
+  }, [article, isUserLang, fullTextTranslated, translateProvider, translateModel, translateSource, translateTarget])
+  const autoTranslateStartedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!autoTranslateKey || translating) return
+    if (autoTranslateStartedRef.current === autoTranslateKey) return
+    autoTranslateStartedRef.current = autoTranslateKey
+    void handleTranslate()
+  }, [autoTranslateKey, handleTranslate, translating])
   const {
     isBookmarked, isLiked, archivingImages, deleteConfirmOpen, setDeleteConfirmOpen,
     toggleBookmark, toggleLike, handleArchiveImages, handleDelete,
