@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { renderMarkdown } from '../lib/markdown'
 import { sanitizeHtml } from '../lib/sanitize'
 import { useStreamingAI } from './use-streaming-ai'
@@ -13,8 +13,10 @@ const STREAMING_OPTIONS = {
 export function useSummarize(
   article: Pick<Article, 'id' | 'summary'> | undefined,
   metrics: ReturnType<typeof useMetrics>,
+  autoRun = false,
 ) {
-  const [summary, setSummary] = useState<string | null>(null)
+  const [summary, setSummary] = useState<string | null>(() => article?.summary ?? null)
+  const autoRunRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (article) setSummary(article.summary)
@@ -29,6 +31,13 @@ export function useSummarize(
     useStreamingAI(article?.id, metrics, options)
 
   const handleSummarize = useCallback(() => run(), [run])
+
+  useEffect(() => {
+    if (!autoRun || !article?.id || summary !== null || article.summary !== null) return
+    if (autoRunRef.current === article.id) return
+    autoRunRef.current = article.id
+    void handleSummarize()
+  }, [autoRun, article?.id, summary, handleSummarize])
 
   const summaryHtml = useMemo(() => {
     if (!summary) return ''

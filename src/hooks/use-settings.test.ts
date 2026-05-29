@@ -125,6 +125,8 @@ describe('useSettings', () => {
     expect(result.current).toHaveProperty('internalLinks')
     expect(result.current).toHaveProperty('highlightTheme')
     expect(result.current).toHaveProperty('indicatorStyle')
+    expect(result.current).toHaveProperty('summaryAuto')
+    expect(result.current).toHaveProperty('setSummaryAuto')
   })
 
   it('hydrates theme from DB prefs', () => {
@@ -155,6 +157,30 @@ describe('useSettings', () => {
     renderHook(() => useSettings())
 
     expect(mockSetDateMode).toHaveBeenCalledWith('absolute')
+  })
+
+  it('hydrates summary.auto from DB prefs', () => {
+    swrData = {
+      'appearance.color_theme': null,
+      'reading.date_mode': null,
+      'reading.auto_mark_read': null,
+      'reading.unread_indicator': null,
+      'reading.internal_links': null,
+      'appearance.highlight_theme': null,
+      'summary.auto': 'on',
+      'summary.provider': null,
+      'summary.model': null,
+      'translate.provider': null,
+      'translate.model': null,
+      'translate.target_lang': null,
+      'chat.provider': null,
+      'chat.model': null,
+      'custom_themes': null,
+    }
+
+    const { result } = renderHook(() => useSettings())
+
+    expect(result.current.summaryAuto).toBe('on')
   })
 
   it('sends backfill PATCH for unset prefs', async () => {
@@ -237,6 +263,23 @@ describe('useSettings', () => {
     expect(mockApiPatch).toHaveBeenCalledWith(
       '/api/settings/preferences',
       expect.objectContaining({ 'reading.date_mode': 'absolute' }),
+    )
+  })
+
+  it('syncedSetSummaryAuto: schedules save', () => {
+    const { result } = renderHook(() => useSettings())
+
+    act(() => {
+      result.current.setSummaryAuto('on')
+    })
+
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+
+    expect(mockApiPatch).toHaveBeenCalledWith(
+      '/api/settings/preferences',
+      expect.objectContaining({ 'summary.auto': 'on' }),
     )
   })
 

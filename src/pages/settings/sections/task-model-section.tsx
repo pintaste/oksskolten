@@ -18,6 +18,7 @@ import type { Settings } from '../../../hooks/use-settings'
 import type { TranslateFn } from '../../../lib/i18n'
 import { isMessageKey } from '../../../lib/i18n'
 import { Languages, MessageCircle, ChevronDown, NotebookText } from 'lucide-react'
+import { RadioGroup } from '@/components/ui/radio-group'
 
 type StoredCustomProvider = { id: string; name: string; baseUrl: string; models: string[]; configured: boolean }
 
@@ -32,6 +33,8 @@ interface TaskConfig {
   setModel: (v: string) => void
   defaultModel: string
   hasTranslateServices?: boolean
+  autoValue?: 'on' | 'off'
+  setAuto?: (v: 'on' | 'off') => void
 }
 
 const SWR_KEY_OPTS = { revalidateOnFocus: false } as const
@@ -129,7 +132,13 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
   const hasAnyTranslateKey = connectedTranslateProviders.length > 0
   const hasAnyKey = hasAnyLlmKey || hasAnyTranslateKey
   const keysLoading = llmKeyStatuses.some(s => !s.data) || translateKeyStatuses.some(s => !s.data)
-  const { setChatProvider, setSummaryProvider, setTranslateProvider } = settings
+  const {
+    setChatProvider,
+    setSummaryProvider,
+    setTranslateProvider,
+    summaryAuto,
+    setSummaryAuto,
+  } = settings
 
   useEffect(() => {
     if (!isTranslateService(settings.chatProvider || '') && hiddenProviderSet.has(settings.chatProvider || '')) {
@@ -167,6 +176,8 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
       modelValue: settings.summaryModel || '',
       setModel: settings.setSummaryModel,
       defaultModel: 'claude-haiku-4-5-20251001',
+      autoValue: summaryAuto === 'on' ? 'on' : 'off',
+      setAuto: setSummaryAuto,
     },
     {
       labelKey: 'integration.task.translate',
@@ -336,6 +347,7 @@ function TaskModelRow({
 }) {
   const hasTranslateServices = !!task.hasTranslateServices
   const currentIsTranslateService = isTranslateService(task.providerValue)
+  const hasAuto = task.setAuto !== undefined
 
   const Icon = task.labelKey === 'integration.task.chat'
     ? MessageCircle
@@ -358,6 +370,10 @@ function TaskModelRow({
   const providerLabel = getProviderLabel(t, task.providerValue, customProviderNames)
   const providerConfigured = task.providerValue ? configuredKeys[task.providerValue] : false
   const isMissingProviderConfig = !task.providerValue || !providerConfigured
+  const autoSetting: 'on' | 'off' = task.autoValue === 'on' ? 'on' : 'off'
+  const summaryAutoValue = autoSetting === 'on'
+    ? t('summary.autoOn')
+    : t('summary.autoOff')
   const summaryText = !hasProviderValue
     ? t('chat.apiKeyNotSet')
     : `${providerLabel} · ${isMissingProviderConfig ? t('chat.apiKeyNotSet') : (task.modelValue || t('chat.apiKeyNotSet'))}`
@@ -375,6 +391,11 @@ function TaskModelRow({
         <div className="flex-1 min-w-0 text-left">
           <div className="text-sm font-semibold text-text truncate">{t(task.labelKey)}</div>
           <div className="text-xs text-muted mt-0.5 truncate">{summaryText}</div>
+          {hasAuto && (
+            <div className="text-xs text-muted mt-0.5 truncate">
+              {t('summary.auto')}: {summaryAutoValue}
+            </div>
+          )}
           {isMissingProviderConfig && (
             <div className="text-xs text-error mt-0.5 truncate">
               {t('chat.apiKeyNotSet')}
@@ -388,6 +409,22 @@ function TaskModelRow({
         </div>
       </button>
       <div className={`px-2.5 pb-2 pt-1.5 border-t border-border space-y-2 ${collapsed ? 'hidden' : ''}`}>
+        {hasAuto && (
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+              {t('summary.auto')}
+            </div>
+            <RadioGroup
+              name={`${task.labelKey}-auto`}
+              options={[
+                { value: 'on', label: t('summary.autoOn') },
+                { value: 'off', label: t('summary.autoOff') },
+              ]}
+              value={autoSetting}
+              onChange={task.setAuto ?? (() => {})}
+            />
+          </div>
+        )}
         {hasTranslateServices && (
           <div>
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">

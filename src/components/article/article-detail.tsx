@@ -34,6 +34,7 @@ interface ArticleDetailProps {
 
 export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
   const { settings: { internalLinks, chatPosition, translateTargetLang } } = useAppLayout()
+  const { settings: { summaryAuto } } = useAppLayout()
   const navigate = useNavigate()
   const { t, tError, isKeyNotSetError, locale } = useI18n()
   const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
@@ -46,7 +47,11 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
   const articleRef = useRef<HTMLElement>(null)
 
   const metrics = useMetrics()
-  const { summary, summarizing, streamingText, handleSummarize, summaryHtml, streamingHtml, error: summarizeError } = useSummarize(article, metrics)
+  const { summary, summarizing, streamingText, handleSummarize, summaryHtml, streamingHtml, error: summarizeError } = useSummarize(
+    article,
+    metrics,
+    summaryAuto === 'on',
+  )
   // Only pass translation to the hook if it matches the current locale; stale translations are treated as absent
   const isTranslationCurrent = article?.translated_lang === (translateTargetLang || locale)
   const translateInput = useMemo(() =>

@@ -45,6 +45,7 @@ interface Prefs {
   'chat.model': string | null
   'summary.provider': string | null
   'summary.model': string | null
+  'summary.auto': string | null
   'translate.provider': string | null
   'translate.model': string | null
   'translate.target_lang': string | null
@@ -81,6 +82,7 @@ export function useSettings() {
   const [chatModel, setChatModelState] = useState<string | null>(null)
   const [summaryProvider, setSummaryProviderState] = useState<string | null>(null)
   const [summaryModel, setSummaryModelState] = useState<string | null>(null)
+  const [summaryAuto, setSummaryAutoState] = useState<'on' | 'off' | null>(null)
   const [translateProvider, setTranslateProviderState] = useState<string | null>(null)
   const [translateModel, setTranslateModelState] = useState<string | null>(null)
   const [translateTargetLang, setTranslateTargetLangState] = useState<string | null>(null)
@@ -111,6 +113,8 @@ export function useSettings() {
   showThumbnailsRef.current = showThumbnails
   const showFeedActivityRef = useRef(showFeedActivity)
   showFeedActivityRef.current = showFeedActivity
+  const summaryAutoRef = useRef('off')
+  summaryAutoRef.current = summaryAuto || 'off'
   const chatPositionRef = useRef(chatPosition)
   chatPositionRef.current = chatPosition
   const articleOpenModeRef = useRef(articleOpenMode)
@@ -170,6 +174,7 @@ export function useSettings() {
       { key: 'chat.model', setter: setChatModelState },
       { key: 'summary.provider', setter: setSummaryProviderState },
       { key: 'summary.model', setter: setSummaryModelState },
+      { key: 'summary.auto', setter: setSummaryAutoState, backfillRef: summaryAutoRef, validate: v => v === 'on' || v === 'off' },
       { key: 'translate.provider', setter: setTranslateProviderState },
       { key: 'translate.model', setter: setTranslateModelState },
       { key: 'translate.target_lang', setter: setTranslateTargetLangState },
@@ -268,6 +273,7 @@ export function useSettings() {
     syncedSetChatModel,
     syncedSetSummaryProvider,
     syncedSetSummaryModel,
+    syncedSetSummaryAuto,
     syncedSetTranslateProvider,
     syncedSetTranslateModel,
     syncedSetTranslateTargetLang,
@@ -297,6 +303,7 @@ export function useSettings() {
       syncedSetChatModel: make<string>('chat.model', setChatModelState),
       syncedSetSummaryProvider: make<string>('summary.provider', setSummaryProviderState),
       syncedSetSummaryModel: make<string>('summary.model', setSummaryModelState),
+      syncedSetSummaryAuto: make<'on' | 'off'>('summary.auto', setSummaryAutoState),
       syncedSetTranslateProvider: make<string>('translate.provider', setTranslateProviderState),
       syncedSetTranslateModel: make<string>('translate.model', setTranslateModelState),
       syncedSetTranslateTargetLang: make<string>('translate.target_lang', setTranslateTargetLangState),
@@ -390,6 +397,8 @@ export function useSettings() {
     setSummaryProvider: syncedSetSummaryProvider,
     summaryModel,
     setSummaryModel: syncedSetSummaryModel,
+    summaryAuto,
+    setSummaryAuto: syncedSetSummaryAuto,
     translateProvider,
     setTranslateProvider: syncedSetTranslateProvider,
     translateModel,

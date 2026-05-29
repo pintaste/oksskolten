@@ -322,6 +322,36 @@ describe('POST /api/settings/preferences', () => {
 // =========================================================================
 
 describe('PATCH /api/settings/preferences — on/off toggles', () => {
+  it('accepts on/off for summary.auto', async () => {
+    const resOn = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'summary.auto': 'on' },
+    })
+    expect(resOn.statusCode).toBe(200)
+    expect(resOn.json()['summary.auto']).toBe('on')
+
+    const resOff = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'summary.auto': 'off' },
+    })
+    expect(resOff.statusCode).toBe(200)
+    expect(resOff.json()['summary.auto']).toBe('off')
+  })
+
+  it('rejects invalid value for summary.auto', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'summary.auto': 'yes' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
   it('accepts on/off for auto_mark_read', async () => {
     const resOn = await app.inject({
       method: 'PATCH',
@@ -712,4 +742,3 @@ describe('vLLM endpoints', () => {
     expect(getSetting('vllm.base_url')).toBe('http://vllm:8000')
   })
 })
-

@@ -78,6 +78,33 @@ describe('useSummarize', () => {
     )
   })
 
+  it('auto-runs when summary.auto is on and summary is missing', async () => {
+    mockStreamPost.mockImplementation((_url: string, onDelta: (text: string) => void) => {
+      onDelta('auto text')
+      return Promise.resolve({ usage: { input_tokens: 20, output_tokens: 8 } })
+    })
+
+    const metrics = mockMetrics()
+    const article = { id: 7, summary: null }
+    renderHook(() => useSummarize(article, metrics, true))
+
+    await waitFor(() => {
+      expect(mockStreamPost).toHaveBeenCalledWith('/api/articles/7/summarize?stream=1', expect.any(Function))
+    })
+  })
+
+  it('does not auto-run when auto is on and summary already exists', async () => {
+    mockStreamPost.mockImplementation(() => Promise.resolve({ usage: { input_tokens: 20, output_tokens: 8 } }))
+
+    const metrics = mockMetrics()
+    const article = { id: 8, summary: 'already there' }
+    renderHook(() => useSummarize(article, metrics, true))
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(mockStreamPost).not.toHaveBeenCalled()
+  })
+
   it('sets final summary on completion', async () => {
     mockStreamPost.mockImplementation((_url: string, onDelta: (text: string) => void) => {
       onDelta('final text')

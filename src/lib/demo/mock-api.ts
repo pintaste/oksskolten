@@ -139,6 +139,7 @@ export async function demoFetcher(url: string): Promise<unknown> {
       'chat.model': 'claude-haiku-4-5-20251001',
       'summary.provider': 'anthropic',
       'summary.model': 'claude-haiku-4-5-20251001',
+      'summary.auto': 'off',
       'translate.provider': 'deepl',
       'translate.model': '',
       'translate.target_lang': null,
