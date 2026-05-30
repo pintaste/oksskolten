@@ -127,9 +127,9 @@ const mockSettings = {
   setTranslateTargetLang: vi.fn(),
   translateSourceLang: null as string | null,
   setTranslateSourceLang: vi.fn(),
-  summaryAuto: 'off' as const,
+  summaryAuto: 'off' as 'on' | 'off',
   setSummaryAuto: vi.fn(),
-  translateAuto: 'on' as const,
+  translateAuto: 'on' as 'on' | 'off',
   setTranslateAuto: vi.fn(),
   save: vi.fn(),
 }
@@ -268,6 +268,62 @@ describe('ArticleDetail like', () => {
     expect(mockApiPatch).toHaveBeenCalledWith('/api/articles/1/like', { liked: true })
   })
 
+})
+
+describe('ArticleDetail summary', () => {
+  const articleUrl = 'https://example.com/posts/1'
+  const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
+  const article = {
+    id: 1,
+    feed_id: 2,
+    feed_name: 'Example Feed',
+    title: 'Example Article',
+    url: articleUrl,
+    published_at: '2026-03-04T00:00:00.000Z',
+    lang: 'en',
+    summary: null,
+    full_text: 'Body',
+    full_text_translated: null,
+    translated_lang: null,
+    seen_at: '2026-03-04T00:00:00.000Z',
+    read_at: '2026-03-04T00:00:00.000Z',
+    bookmarked_at: null,
+    liked_at: null,
+  }
+
+  beforeEach(() => {
+    mockApiPatch.mockReset()
+    mockApiPatch.mockResolvedValue({ bookmarked_at: '2026-03-05T00:00:00.000Z' })
+    mockApiPost.mockReset()
+    mockApiPost.mockResolvedValue(undefined)
+    mockSummarizeHandle.mockClear()
+    mockTrackRead.mockReset()
+    mockQueueSeenIds.mockClear()
+  })
+
+  it('calls summarize without force when no existing summary', async () => {
+    render(
+      <MemoryRouter>
+        <LocaleContext.Provider value={{ locale: 'en', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="*" element={<ArticleDetail articleUrl={articleUrl} />} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+
+    const summarizeButton = screen.getByRole('button', { name: /Summarize/i })
+    fireEvent.click(summarizeButton)
+
+    // First-time summarize: force=false (no cache to bypass)
+    expect(mockSummarizeHandle).toHaveBeenCalledWith(false)
+  })
 })
 
 describe('ArticleDetail stale translation filtering', () => {
@@ -645,7 +701,7 @@ describe('ArticleDetail immersive translation', () => {
 
     render(
       <MemoryRouter>
-        <LocaleContext.Provider value={{ locale: 'fr', setLocale: vi.fn() }}>
+        <LocaleContext.Provider value={{ locale: 'zh', setLocale: vi.fn() }}>
           <TooltipProvider>
             <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article } }}>
               <Routes>

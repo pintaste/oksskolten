@@ -5,8 +5,8 @@ import { streamPost } from '../lib/fetcher'
 import type { useMetrics } from './use-metrics'
 
 interface StreamingAIOptions {
-  /** Build the API endpoint URL from the article id */
-  endpoint: (articleId: number) => string
+  /** Build the endpoint URL from the article id */
+  endpoint: (articleId: number, force?: boolean) => string
   /** Called with the final streamed text + raw usage on success */
   onComplete?: (text: string, usage: Record<string, unknown>) => void
   /** Close unclosed markdown bold markers in streaming preview */
@@ -22,7 +22,7 @@ export function useStreamingAI(
   const [streamingText, setStreamingText] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (force = false) => {
     if (articleId == null) return
     setProcessing(true)
     setStreamingText('')
@@ -32,7 +32,7 @@ export function useStreamingAI(
 
     try {
       const { usage } = await streamPost(
-        options.endpoint(articleId),
+        options.endpoint(articleId, force),
         (delta) => setStreamingText(prev => prev + delta),
       )
 

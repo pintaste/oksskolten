@@ -6,7 +6,7 @@ import type { useMetrics } from './use-metrics'
 import type { Article } from '../../shared/types'
 
 const STREAMING_OPTIONS = {
-  endpoint: (id: number) => `/api/articles/${id}/summarize?stream=1`,
+  endpoint: (id: number, force = false) => `/api/articles/${id}/summarize?stream=1${force ? '&force=1' : ''}`,
   fixUnclosedBold: true,
 } as const
 
@@ -30,13 +30,13 @@ export function useSummarize(
   const { processing: summarizing, streamingText, streamingHtml, error, run } =
     useStreamingAI(article?.id, metrics, options)
 
-  const handleSummarize = useCallback(() => run(), [run])
+  const handleSummarize = useCallback((force = false) => run(force), [run])
 
   useEffect(() => {
     if (!autoRun || !article?.id || summary !== null || article.summary !== null) return
     if (autoRunRef.current === article.id) return
     autoRunRef.current = article.id
-    void handleSummarize()
+    void handleSummarize(false)
   }, [autoRun, article?.id, summary, handleSummarize])
 
   const summaryHtml = useMemo(() => {

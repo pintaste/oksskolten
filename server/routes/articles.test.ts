@@ -116,6 +116,35 @@ describe('POST /api/articles/:id/summarize?stream=1', () => {
     expect(res.json().cached).toBe(true)
   })
 
+  it('forces regen summary when force=1 even if cached', async () => {
+    const feed = seedFeed()
+    const artId = seedArticle(feed.id, { full_text: 'text', summary: 'Cached' })
+
+    mockStreamSummarize.mockImplementation(async (_text: string, onDelta: (d: string) => void) => {
+      onDelta('new')
+      return { summary: 'new summary', inputTokens: 12, outputTokens: 7, billingMode: 'standard', model: 'haiku' }
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/articles/${artId}/summarize?stream=1&force=1`,
+      headers: json,
+      payload: {},
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toBe('text/event-stream')
+
+    const events = res.body
+      .split('\n')
+      .filter((l: string) => l.startsWith('data: '))
+      .map((l: string) => JSON.parse(l.slice(6)))
+
+    expect(events.some((e: unknown) => (e as { type?: string }).type === 'done')).toBe(true)
+    expect(events.some((e: unknown) => (e as { type?: string; text?: string }).type === 'delta' && (e as { text?: string }).text === 'new')).toBe(true)
+    expect(events.some((e: unknown) => (e as { cached?: boolean }).cached === true)).toBe(false)
+  })
+
   it('handles streaming error after headers sent', async () => {
     const feed = seedFeed()
     const artId = seedArticle(feed.id, { full_text: 'Long content' })
