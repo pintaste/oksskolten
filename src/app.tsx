@@ -84,6 +84,11 @@ function AppLayout() {
     document.title = APP_NAME
   }, [])
 
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.toggle('locale-font-ja', locale === 'ja')
+  }, [locale])
+
   return (
     <LocaleContext.Provider value={localeCtx}>
       <TooltipProvider delayDuration={300}>

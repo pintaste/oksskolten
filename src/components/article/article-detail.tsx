@@ -33,8 +33,7 @@ interface ArticleDetailProps {
 }
 
 export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
-  const { settings: { internalLinks, chatPosition, translateProvider, translateModel, translateTargetLang, translateSourceLang } } = useAppLayout()
-  const { settings: { summaryAuto } } = useAppLayout()
+  const { settings: { internalLinks, chatPosition, translateProvider, translateModel, translateTargetLang, translateSourceLang, summaryAuto, translateAuto } } = useAppLayout()
   const navigate = useNavigate()
   const { t, tError, isKeyNotSetError, locale } = useI18n()
   const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
@@ -63,11 +62,11 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
   const { viewMode, setViewMode, translating, translatingText, fullTextTranslated, handleTranslate, translatingHtml, error: translateError } = useTranslate(translateInput, metrics)
 
   const autoTranslateKey = useMemo(() => {
-    if (!article || isUserLang || !translateProvider || fullTextTranslated) {
+    if (!article || isUserLang || translateAuto !== 'on' || !translateProvider || fullTextTranslated) {
       return null
     }
     return `${article.id}:${translateProvider}:${translateModel || ''}:${translateTarget}:${translateSource}`
-  }, [article, isUserLang, fullTextTranslated, translateProvider, translateModel, translateSource, translateTarget])
+  }, [article, isUserLang, translateAuto, translateProvider, translateModel, translateSource, translateTarget, fullTextTranslated])
   const autoTranslateStartedRef = useRef<string | null>(null)
   useEffect(() => {
     if (!autoTranslateKey || translating) return

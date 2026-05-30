@@ -9,23 +9,32 @@ describe('formatDate', () => {
   it('formats a date in current year without year', () => {
     const thisYear = new Date().getFullYear()
     const result = formatDate(`${thisYear}-03-15T00:00:00Z`, 'en')
-    expect(result).toContain('Mar')
-    expect(result).toContain('15')
+    const expected = new Date(`${thisYear}-03-15T00:00:00Z`).toLocaleDateString('en', {
+      month: 'short',
+      day: 'numeric',
+    })
+    expect(result).toBe(expected)
     expect(result).not.toContain(String(thisYear))
   })
 
   it('formats a date in past year with year', () => {
     const result = formatDate('2023-12-01T00:00:00Z', 'en')
-    expect(result).toContain('Dec')
-    expect(result).toContain('1')
-    expect(result).toContain('2023')
+    const expected = new Date('2023-12-01T00:00:00Z').toLocaleDateString('en', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    expect(result).toBe(expected)
   })
 
   it('formats a date in ja locale', () => {
     const thisYear = new Date().getFullYear()
     const result = formatDate(`${thisYear}-03-15T00:00:00Z`, 'ja')
-    expect(result).toContain('3')
-    expect(result).toContain('15')
+    const expected = new Date(`${thisYear}-03-15T00:00:00Z`).toLocaleDateString('ja', {
+      month: 'short',
+      day: 'numeric',
+    })
+    expect(result).toBe(expected)
   })
 })
 
@@ -96,8 +105,11 @@ describe('formatDetailDate', () => {
 
   it('includes year, month and day', () => {
     const result = formatDetailDate('2025-03-15T00:00:00Z', 'en')
-    expect(result).toContain('Mar')
-    expect(result).toContain('15')
-    expect(result).toContain('2025')
+    const expected = new Date('2025-03-15T00:00:00Z').toLocaleDateString('en', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    expect(result).toBe(expected)
   })
 })

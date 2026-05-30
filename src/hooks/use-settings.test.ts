@@ -127,6 +127,8 @@ describe('useSettings', () => {
     expect(result.current).toHaveProperty('indicatorStyle')
     expect(result.current).toHaveProperty('summaryAuto')
     expect(result.current).toHaveProperty('setSummaryAuto')
+    expect(result.current).toHaveProperty('translateAuto')
+    expect(result.current).toHaveProperty('setTranslateAuto')
     expect(result.current).toHaveProperty('translateSourceLang')
     expect(result.current).toHaveProperty('setTranslateSourceLang')
   })
@@ -183,6 +185,32 @@ describe('useSettings', () => {
     const { result } = renderHook(() => useSettings())
 
     expect(result.current.summaryAuto).toBe('on')
+  })
+
+  it('hydrates translate.auto from DB prefs', () => {
+    swrData = {
+      'appearance.color_theme': null,
+      'reading.date_mode': null,
+      'reading.auto_mark_read': null,
+      'reading.unread_indicator': null,
+      'reading.internal_links': null,
+      'appearance.highlight_theme': null,
+      'summary.auto': null,
+      'summary.provider': null,
+      'summary.model': null,
+      'translate.auto': 'on',
+      'translate.provider': null,
+      'translate.model': null,
+      'translate.target_lang': null,
+      'translate.source_lang': null,
+      'chat.provider': null,
+      'chat.model': null,
+      'custom_themes': null,
+    }
+
+    const { result } = renderHook(() => useSettings())
+
+    expect(result.current.translateAuto).toBe('on')
   })
 
   it('hydrates translate.source_lang from DB prefs', () => {
@@ -307,6 +335,23 @@ describe('useSettings', () => {
     expect(mockApiPatch).toHaveBeenCalledWith(
       '/api/settings/preferences',
       expect.objectContaining({ 'summary.auto': 'on' }),
+    )
+  })
+
+  it('syncedSetTranslateAuto: schedules save', () => {
+    const { result } = renderHook(() => useSettings())
+
+    act(() => {
+      result.current.setTranslateAuto('on')
+    })
+
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+
+    expect(mockApiPatch).toHaveBeenCalledWith(
+      '/api/settings/preferences',
+      expect.objectContaining({ 'translate.auto': 'on' }),
     )
   })
 

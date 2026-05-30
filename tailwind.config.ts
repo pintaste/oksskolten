@@ -9,7 +9,6 @@ export default {
       fontFamily: {
         sans: [
           'Noto Sans',
-          'Noto Sans JP',
           'ui-sans-serif',
           'system-ui',
           '-apple-system',

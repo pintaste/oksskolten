@@ -378,12 +378,42 @@ describe('PATCH /api/settings/preferences — on/off toggles', () => {
     expect(resOff.json()['summary.auto']).toBe('off')
   })
 
+  it('accepts on/off for translate.auto', async () => {
+    const resOn = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'translate.auto': 'on' },
+    })
+    expect(resOn.statusCode).toBe(200)
+    expect(resOn.json()['translate.auto']).toBe('on')
+
+    const resOff = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'translate.auto': 'off' },
+    })
+    expect(resOff.statusCode).toBe(200)
+    expect(resOff.json()['translate.auto']).toBe('off')
+  })
+
   it('rejects invalid value for summary.auto', async () => {
     const res = await app.inject({
       method: 'PATCH',
       url: '/api/settings/preferences',
       headers: json,
       payload: { 'summary.auto': 'yes' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('rejects invalid value for translate.auto', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'translate.auto': 'yes' },
     })
     expect(res.statusCode).toBe(400)
   })

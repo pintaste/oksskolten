@@ -35,6 +35,9 @@ interface TaskConfig {
   hasTranslateServices?: boolean
   autoValue?: 'on' | 'off'
   setAuto?: (v: 'on' | 'off') => void
+  autoLabelKey?: MessageKey
+  autoOnKey?: MessageKey
+  autoOffKey?: MessageKey
 }
 
 const SWR_KEY_OPTS = { revalidateOnFocus: false } as const
@@ -132,13 +135,15 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
   const hasAnyTranslateKey = connectedTranslateProviders.length > 0
   const hasAnyKey = hasAnyLlmKey || hasAnyTranslateKey
   const keysLoading = llmKeyStatuses.some(s => !s.data) || translateKeyStatuses.some(s => !s.data)
-  const {
-    setChatProvider,
-    setSummaryProvider,
-    setTranslateProvider,
-    summaryAuto,
-    setSummaryAuto,
-  } = settings
+    const {
+      setChatProvider,
+      setSummaryProvider,
+      setTranslateProvider,
+      summaryAuto,
+      setSummaryAuto,
+      translateAuto,
+      setTranslateAuto,
+    } = settings
 
   useEffect(() => {
     if (!isTranslateService(settings.chatProvider || '') && hiddenProviderSet.has(settings.chatProvider || '')) {
@@ -191,6 +196,11 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
       setModel: settings.setTranslateModel,
       defaultModel: 'claude-sonnet-4-6',
       hasTranslateServices: true,
+      autoValue: translateAuto === 'on' ? 'on' : 'off',
+      setAuto: setTranslateAuto,
+      autoLabelKey: 'translate.auto',
+      autoOnKey: 'translate.autoOn',
+      autoOffKey: 'translate.autoOff',
     },
   ]
 
@@ -255,38 +265,6 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
                 )
               })}
             </div>
-          </div>
-        </div>
-        <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-center md:gap-5" role="radiogroup" aria-label={t('settings.translateSourceLang')}>
-          <span className="text-xs font-medium text-text select-none shrink-0">
-            {t('settings.translateSourceLang')}
-          </span>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 md:flex-1">
-            {([
-              { value: '' as const, label: t('settings.translateSourceLangAuto') },
-              { value: 'ja' as const, label: t('settings.languageJa') },
-              { value: 'en' as const, label: t('settings.languageEn') },
-              { value: 'zh' as const, label: t('settings.languageZh') },
-            ]).map(opt => {
-              const selected = (settings.translateSourceLang || '') === opt.value
-            return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => settings.setTranslateSourceLang(opt.value)}
-                  className={`flex min-w-fit h-7 items-center gap-2 rounded-md px-2 py-0.5 text-xs font-medium leading-none transition-colors select-none ${
-                    selected ? 'text-text' : 'text-muted hover:text-text'
-                  }`}
-                >
-                  <span className={`relative h-[18px] w-[18px] rounded-full border-2 shrink-0 ${selected ? 'border-accent' : 'border-muted/40'}`}>
-                    {selected && <span className="absolute inset-1 rounded-full bg-accent" />}
-                  </span>
-                  <span className="whitespace-nowrap">{opt.label}</span>
-                </button>
-              )
-            })}
           </div>
         </div>
         <div className="mt-2 space-y-1.5">
@@ -380,6 +358,9 @@ function TaskModelRow({
   const hasTranslateServices = !!task.hasTranslateServices
   const currentIsTranslateService = isTranslateService(task.providerValue)
   const hasAuto = task.setAuto !== undefined
+  const autoLabelKey: MessageKey = task.autoLabelKey ?? 'summary.auto'
+  const autoOnKey: MessageKey = task.autoOnKey ?? 'summary.autoOn'
+  const autoOffKey: MessageKey = task.autoOffKey ?? 'summary.autoOff'
 
   const Icon = task.labelKey === 'integration.task.chat'
     ? MessageCircle
@@ -403,9 +384,7 @@ function TaskModelRow({
   const providerConfigured = task.providerValue ? configuredKeys[task.providerValue] : false
   const isMissingProviderConfig = !task.providerValue || !providerConfigured
   const autoSetting: 'on' | 'off' = task.autoValue === 'on' ? 'on' : 'off'
-  const summaryAutoValue = autoSetting === 'on'
-    ? t('summary.autoOn')
-    : t('summary.autoOff')
+  const summaryAutoValue = autoSetting === 'on' ? t(autoOnKey) : t(autoOffKey)
   const summaryText = !hasProviderValue
     ? t('chat.apiKeyNotSet')
     : `${providerLabel} · ${isMissingProviderConfig ? t('chat.apiKeyNotSet') : (task.modelValue || t('chat.apiKeyNotSet'))}`
@@ -425,7 +404,7 @@ function TaskModelRow({
           <div className="text-xs text-muted mt-0.5 truncate">{summaryText}</div>
           {hasAuto && (
             <div className="text-xs text-muted mt-0.5 truncate">
-              {t('summary.auto')}: {summaryAutoValue}
+              {t(autoLabelKey)}: {summaryAutoValue}
             </div>
           )}
           {isMissingProviderConfig && (
@@ -444,14 +423,16 @@ function TaskModelRow({
         {hasAuto && (
           <div>
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
-              {t('summary.auto')}
+              {t(autoLabelKey)}
             </div>
             <RadioGroup
               name={`${task.labelKey}-auto`}
               options={[
-                { value: 'on', label: t('summary.autoOn') },
-                { value: 'off', label: t('summary.autoOff') },
+                { value: 'on', label: t(autoOnKey) },
+                { value: 'off', label: t(autoOffKey) },
               ]}
+              className="flex items-center gap-3"
+              optionClassName="flex items-center gap-2.5 cursor-pointer py-1"
               value={autoSetting}
               onChange={task.setAuto ?? (() => {})}
             />

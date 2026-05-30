@@ -8,15 +8,24 @@ interface RadioGroupProps<T extends string> {
   options: RadioOption<T>[]
   value: T
   onChange: (value: T) => void
+  className?: string
+  optionClassName?: string
 }
 
-export function RadioGroup<T extends string>({ name, options, value, onChange }: RadioGroupProps<T>) {
+export function RadioGroup<T extends string>({
+  name,
+  options,
+  value,
+  onChange,
+  className,
+  optionClassName,
+}: RadioGroupProps<T>) {
   return (
-    <div className="space-y-1.5">
+    <div className={className ?? 'space-y-1.5'}>
       {options.map(option => (
         <label
           key={option.value}
-          className="flex items-center gap-2.5 cursor-pointer py-1"
+          className={optionClassName ?? 'flex items-center gap-2.5 cursor-pointer py-1'}
         >
           <span
             className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${

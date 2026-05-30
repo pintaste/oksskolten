@@ -48,6 +48,14 @@
   --radius: 0.75rem;
 }
 
+html:not(.locale-font-ja) {
+  font-family: "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html.locale-font-ja {
+  font-family: "Noto Sans JP", "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
 .dark {
   --color-bg: #111111;
   --color-bg-card: #111111;
