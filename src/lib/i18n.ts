@@ -518,7 +518,7 @@ const dict = {
   'integration.removeProvider': { ja: 'プロバイダーを隠す', en: 'Hide provider', zh: '隐藏提供商'},
   'integration.translateServiceConfig': { ja: '翻訳サービス', en: 'Translation Services', zh: '翻译服务'},
   'integration.translateServiceConfigDesc': { ja: '記事の翻訳に使用します。LLM プロバイダーまたはこちらのいずれかが設定されていないと翻訳は利用できません', en: 'Used for article translation. Either an LLM provider or one of these services must be configured to use translation', zh: '用于文章翻译。需要配置 LLM 提供商或以下翻译服务之一' },
-  'integration.taskSettings': { ja: '機能ごとのプロバイダー', en: 'Provider per Feature', zh: '按功能选择提供商'},
+  'integration.taskSettings': { ja: 'タスク設定', en: 'Task Configuration', zh: '任务配置'},
   'integration.taskSettingsDesc': { ja: '要約・翻訳・チャットそれぞれでどのプロバイダーとモデルを使うかを設定します', en: 'Choose which provider and model to use for summarization, translation, and chat', zh: '选择用于摘要、翻译和聊天的提供商和模型' },
   'integration.taskSettingsNoKeys': { ja: 'API キーが設定されていないため変更できません。上のセクションで API キーを設定してください', en: 'Cannot change settings because no API keys are configured. Please set up an API key in the section above', zh: '无法更改设置，因为未配置 API 密钥。请在上方配置 API 密钥' },
   'integration.selectProviderFirst': { ja: 'プロバイダーを選択してください', en: 'Select a provider first', zh: '请先选择提供商'},

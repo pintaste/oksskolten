@@ -154,10 +154,12 @@ export function ProviderConfigSection({ t, hiddenProviders, setHiddenProvider }:
   }
 
   return (
-    <section className="space-y-7">
+    <section className="space-y-4">
       <div>
-        <h2 className="text-base font-semibold text-text mb-1">{t('integration.llmProviderConfig')}</h2>
-        <p className="text-xs text-muted mb-3">{t('integration.llmProviderConfigDesc')}</p>
+        <h2 className="text-base font-semibold text-text mb-1">{t('integration.providerConfig')}</h2>
+        <p className="text-xs text-muted mb-3">{t('integration.providerConfigDesc')}</p>
+
+        {/* LLM providers */}
         <div className="grid grid-cols-1 gap-2.5 items-start">
           {LLM_API_PROVIDERS.filter(p => p !== 'deepseek' && p !== 'mimo' && p !== 'anthropic').map(provider => (
             !hiddenProviderSet.has(provider) && (
@@ -199,7 +201,7 @@ export function ProviderConfigSection({ t, hiddenProviders, setHiddenProvider }:
           <CustomCard t={t} onSaved={refreshCustomProviders} />
         </div>
 
-        {/* Hidden providers shortcuts — restored here, below Custom */}
+        {/* Hidden providers shortcuts */}
         {hiddenProviders.length > 0 && (
           <div className="mt-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted mb-2 select-none">{t('integration.hiddenProviders')}</div>
@@ -221,14 +223,15 @@ export function ProviderConfigSection({ t, hiddenProviders, setHiddenProvider }:
             </div>
           </div>
         )}
-      </div>
-      <div className="border-t border-border pt-5">
-        <h2 className="text-base font-semibold text-text mb-1">{t('integration.translateServiceConfig')}</h2>
-        <p className="text-xs text-muted mb-3">{t('integration.translateServiceConfigDesc')}</p>
-        <div className="grid grid-cols-1 gap-2.5 items-start">
-          {TRANSLATE_SERVICE_PROVIDERS.map(provider => (
-            <ApiProviderCard key={provider} provider={provider} t={t} />
-          ))}
+
+        {/* Translation services — merged into same section */}
+        <div className="mt-4">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted mb-2 select-none">{t('integration.translateServiceConfig')}</div>
+          <div className="grid grid-cols-1 gap-2.5 items-start">
+            {TRANSLATE_SERVICE_PROVIDERS.map(provider => (
+              <ApiProviderCard key={provider} provider={provider} t={t} />
+            ))}
+          </div>
         </div>
       </div>
     </section>

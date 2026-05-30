@@ -205,6 +205,8 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
       autoLabelKey: 'translate.auto',
       autoOnKey: 'translate.autoOn',
       autoOffKey: 'translate.autoOff',
+      targetLangValue: settings.translateTargetLang,
+      setTargetLang: settings.setTranslateTargetLang,
     },
   ]
 
@@ -237,41 +239,7 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
         <p className="text-xs text-muted mt-1">{t('integration.taskSettingsDesc')}</p>
       </div>
       <div className={`${!keysLoading && !hasAnyKey ? 'opacity-50 pointer-events-none' : ''}`}>
-        <div className="rounded-lg bg-bg-card border border-border shadow-sm px-3 py-2 md:px-3.5">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-5" role="radiogroup" aria-label={t('settings.translateTargetLang')}>
-            <span className="text-xs font-medium text-text select-none shrink-0">
-              {t('settings.translateTargetLang')}
-            </span>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 md:flex-1">
-              {([
-                { value: '' as const, label: t('settings.translateTargetLangAuto') },
-                { value: 'ja' as const, label: t('settings.languageJa') },
-                { value: 'en' as const, label: t('settings.languageEn') },
-                { value: 'zh' as const, label: t('settings.languageZh') },
-              ]).map(opt => {
-                const selected = (settings.translateTargetLang || '') === opt.value
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => settings.setTranslateTargetLang(opt.value)}
-                  className={`flex min-w-fit h-7 items-center gap-2 rounded-md px-2 py-0.5 text-xs font-medium leading-none transition-colors select-none ${
-                    selected ? 'text-text' : 'text-muted hover:text-text'
-                  }`}
-                >
-                    <span className={`relative h-[18px] w-[18px] rounded-full border-2 shrink-0 ${selected ? 'border-accent' : 'border-muted/40'}`}>
-                      {selected && <span className="absolute inset-1 rounded-full bg-accent" />}
-                    </span>
-                    <span className="whitespace-nowrap">{opt.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-        <div className="mt-2 space-y-1.5">
+        <div className="space-y-1.5">
           {tasks.map(task => (
             <TaskModelRow
               key={task.labelKey}
@@ -297,6 +265,43 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
 }
 
 /* ── Helpers ── */
+
+function LangRadioRow({ label, value, onChange, autoLabel, t }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  autoLabel: string
+  t: TFunc
+}) {
+  const opts = [
+    { value: '', label: autoLabel },
+    { value: 'ja', label: t('settings.languageJa') },
+    { value: 'en', label: t('settings.languageEn') },
+    { value: 'zh', label: t('settings.languageZh') },
+  ]
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5" role="radiogroup" aria-label={label || undefined}>
+        {opts.map(opt => {
+          const selected = value === opt.value
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(opt.value)}
+              className={`flex min-w-fit h-7 items-center gap-2 rounded-md px-2 py-0.5 text-xs font-medium leading-none transition-colors select-none ${selected ? 'text-text' : 'text-muted hover:text-text'}`}
+            >
+              <span className={`relative h-[18px] w-[18px] rounded-full border-2 shrink-0 ${selected ? 'border-accent' : 'border-muted/40'}`}>
+                {selected && <span className="absolute inset-1 rounded-full bg-accent" />}
+              </span>
+              <span className="whitespace-nowrap">{opt.label}</span>
+            </button>
+          )
+        })}
+    </div>
+  )
+}
 
 function getModelGroups(provider: string): ModelGroup[] {
   if (provider === 'anthropic') return ANTHROPIC_MODELS
@@ -389,7 +394,6 @@ function TaskModelRow({
   const providerConfigured = task.providerValue ? configuredKeys[task.providerValue] : false
   const isMissingProviderConfig = !task.providerValue || !providerConfigured
   const autoSetting: 'on' | 'off' = task.autoValue === 'on' ? 'on' : 'off'
-  const summaryAutoValue = autoSetting === 'on' ? t(autoOnKey) : t(autoOffKey)
   const summaryText = !hasProviderValue
     ? t('chat.apiKeyNotSet')
     : `${providerLabel} · ${isMissingProviderConfig ? t('chat.apiKeyNotSet') : (task.modelValue || t('chat.apiKeyNotSet'))}`
@@ -407,21 +411,6 @@ function TaskModelRow({
         <div className="flex-1 min-w-0 text-left">
           <div className="text-sm font-semibold text-text truncate">{t(task.labelKey)}</div>
           <div className="text-xs text-muted mt-0.5 truncate">{summaryText}</div>
-          {hasAuto && (
-            <div className="text-xs text-muted mt-0.5 truncate">
-              {t(autoLabelKey)}: {summaryAutoValue}
-            </div>
-          )}
-          {hasTargetLang && (
-            <div className="text-xs text-muted mt-0.5 truncate">
-              {t('settings.summaryTargetLang')}: {task.targetLangValue ? t(`settings.language${task.targetLangValue.charAt(0).toUpperCase() + task.targetLangValue.slice(1)}` as MessageKey) : t('settings.translateTargetLangAuto')}
-            </div>
-          )}
-          {hasProviderValue && isMissingProviderConfig && (
-            <div className="text-xs text-error mt-0.5 truncate">
-              {t('chat.apiKeyNotSet')}
-            </div>
-          )}
         </div>
           <ChevronDown
             size={14}
@@ -451,33 +440,15 @@ function TaskModelRow({
         {hasTargetLang && (
           <div>
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
-              {t('settings.summaryTargetLang')}
+              {task.labelKey === 'integration.task.translate' ? t('settings.translateTargetLang') : t('settings.summaryTargetLang')}
             </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {([
-                { value: '', label: t('settings.translateTargetLangAuto') },
-                { value: 'ja', label: t('settings.languageJa') },
-                { value: 'en', label: t('settings.languageEn') },
-                { value: 'zh', label: t('settings.languageZh') },
-              ]).map(opt => {
-                const selected = (task.targetLangValue || '') === opt.value
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => task.setTargetLang!(opt.value)}
-                    className={`flex h-7 items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium transition-colors select-none ${selected ? 'text-text' : 'text-muted hover:text-text'}`}
-                  >
-                    <span className={`relative h-[16px] w-[16px] rounded-full border-2 shrink-0 ${selected ? 'border-accent' : 'border-muted/40'}`}>
-                      {selected && <span className="absolute inset-1 rounded-full bg-accent" />}
-                    </span>
-                    <span className="whitespace-nowrap">{opt.label}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <LangRadioRow
+              label=""
+              value={task.targetLangValue || ''}
+              onChange={task.setTargetLang!}
+              autoLabel={t('settings.translateTargetLangAuto')}
+              t={t}
+            />
           </div>
         )}
         {hasTranslateServices && (
