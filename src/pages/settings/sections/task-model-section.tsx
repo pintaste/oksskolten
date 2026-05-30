@@ -38,6 +38,8 @@ interface TaskConfig {
   autoLabelKey?: MessageKey
   autoOnKey?: MessageKey
   autoOffKey?: MessageKey
+  targetLangValue?: string | null
+  setTargetLang?: (v: string) => void
 }
 
 const SWR_KEY_OPTS = { revalidateOnFocus: false } as const
@@ -183,6 +185,8 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
       defaultModel: 'claude-haiku-4-5-20251001',
       autoValue: summaryAuto === 'on' ? 'on' : 'off',
       setAuto: setSummaryAuto,
+      targetLangValue: settings.summaryTargetLang,
+      setTargetLang: settings.setSummaryTargetLang,
     },
     {
       labelKey: 'integration.task.translate',
@@ -358,6 +362,7 @@ function TaskModelRow({
   const hasTranslateServices = !!task.hasTranslateServices
   const currentIsTranslateService = isTranslateService(task.providerValue)
   const hasAuto = task.setAuto !== undefined
+  const hasTargetLang = task.setTargetLang !== undefined
   const autoLabelKey: MessageKey = task.autoLabelKey ?? 'summary.auto'
   const autoOnKey: MessageKey = task.autoOnKey ?? 'summary.autoOn'
   const autoOffKey: MessageKey = task.autoOffKey ?? 'summary.autoOff'
@@ -407,7 +412,12 @@ function TaskModelRow({
               {t(autoLabelKey)}: {summaryAutoValue}
             </div>
           )}
-          {isMissingProviderConfig && (
+          {hasTargetLang && (
+            <div className="text-xs text-muted mt-0.5 truncate">
+              {t('settings.summaryTargetLang')}: {task.targetLangValue ? t(`settings.language${task.targetLangValue.charAt(0).toUpperCase() + task.targetLangValue.slice(1)}` as MessageKey) : t('settings.translateTargetLangAuto')}
+            </div>
+          )}
+          {hasProviderValue && isMissingProviderConfig && (
             <div className="text-xs text-error mt-0.5 truncate">
               {t('chat.apiKeyNotSet')}
             </div>
@@ -436,6 +446,38 @@ function TaskModelRow({
               value={autoSetting}
               onChange={task.setAuto ?? (() => {})}
             />
+          </div>
+        )}
+        {hasTargetLang && (
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+              {t('settings.summaryTargetLang')}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {([
+                { value: '', label: t('settings.translateTargetLangAuto') },
+                { value: 'ja', label: t('settings.languageJa') },
+                { value: 'en', label: t('settings.languageEn') },
+                { value: 'zh', label: t('settings.languageZh') },
+              ]).map(opt => {
+                const selected = (task.targetLangValue || '') === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => task.setTargetLang!(opt.value)}
+                    className={`flex h-7 items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium transition-colors select-none ${selected ? 'text-text' : 'text-muted hover:text-text'}`}
+                  >
+                    <span className={`relative h-[16px] w-[16px] rounded-full border-2 shrink-0 ${selected ? 'border-accent' : 'border-muted/40'}`}>
+                      {selected && <span className="absolute inset-1 rounded-full bg-accent" />}
+                    </span>
+                    <span className="whitespace-nowrap">{opt.label}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
         {hasTranslateServices && (

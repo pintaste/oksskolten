@@ -23,7 +23,7 @@ export function detectLanguage(fullText: string): string {
 
 
 function buildSummarizePrompt(fullText: string): string {
-  const lang = getSetting('general.language') || DEFAULT_LANGUAGE
+  const lang = getSetting('summary.target_lang') || getSetting('general.language') || DEFAULT_LANGUAGE
   return `Summarize the following article in ${languageName(lang)}. Follow the format strictly.
 
 ## Format

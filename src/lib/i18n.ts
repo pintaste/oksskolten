@@ -356,6 +356,9 @@ const dict = {
   'settings.languageEn': { ja: '英語', en: 'English', zh: '英语' },
   'settings.languageZh': { ja: '中国語', en: 'Chinese', zh: '简体中文' },
 
+  // Summary target language
+  'settings.summaryTargetLang': { ja: '要約言語', en: 'Summary language', zh: '摘要语言'},
+
   // Translation target language
   'settings.translateTargetLang': { ja: '翻訳先言語', en: 'Translation language', zh: '翻译目标语言'},
   'settings.translateTargetLangDesc': { ja: '記事をどの言語に翻訳するか', en: 'Language to translate articles into', zh: '将文章翻译为哪种语言'},

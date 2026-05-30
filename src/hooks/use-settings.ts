@@ -46,6 +46,7 @@ interface Prefs {
   'summary.provider': string | null
   'summary.model': string | null
   'summary.auto': string | null
+  'summary.target_lang': string | null
   'translate.auto': string | null
   'translate.provider': string | null
   'translate.model': string | null
@@ -85,6 +86,7 @@ export function useSettings() {
   const [summaryProvider, setSummaryProviderState] = useState<string | null>(null)
   const [summaryModel, setSummaryModelState] = useState<string | null>(null)
   const [summaryAuto, setSummaryAutoState] = useState<'on' | 'off' | null>(null)
+  const [summaryTargetLang, setSummaryTargetLangState] = useState<string | null>(null)
   const [translateAuto, setTranslateAutoState] = useState<'on' | 'off' | null>(null)
   const [translateProvider, setTranslateProviderState] = useState<string | null>(null)
   const [translateModel, setTranslateModelState] = useState<string | null>(null)
@@ -181,6 +183,7 @@ export function useSettings() {
       { key: 'summary.provider', setter: setSummaryProviderState },
       { key: 'summary.model', setter: setSummaryModelState },
       { key: 'summary.auto', setter: setSummaryAutoState, backfillRef: summaryAutoRef, validate: v => v === 'on' || v === 'off' },
+      { key: 'summary.target_lang', setter: setSummaryTargetLangState },
       { key: 'translate.auto', setter: setTranslateAutoState, backfillRef: translateAutoRef, validate: v => v === 'on' || v === 'off' },
       { key: 'translate.provider', setter: setTranslateProviderState },
       { key: 'translate.model', setter: setTranslateModelState },
@@ -282,6 +285,7 @@ export function useSettings() {
       syncedSetSummaryProvider,
       syncedSetSummaryModel,
       syncedSetSummaryAuto,
+      syncedSetSummaryTargetLang,
       syncedSetTranslateAuto,
       syncedSetTranslateProvider,
       syncedSetTranslateModel,
@@ -314,6 +318,7 @@ export function useSettings() {
       syncedSetSummaryProvider: make<string>('summary.provider', setSummaryProviderState),
       syncedSetSummaryModel: make<string>('summary.model', setSummaryModelState),
       syncedSetSummaryAuto: make<'on' | 'off'>('summary.auto', setSummaryAutoState),
+      syncedSetSummaryTargetLang: make<string>('summary.target_lang', setSummaryTargetLangState),
       syncedSetTranslateAuto: make<'on' | 'off'>('translate.auto', setTranslateAutoState),
       syncedSetTranslateProvider: make<string>('translate.provider', setTranslateProviderState),
       syncedSetTranslateModel: make<string>('translate.model', setTranslateModelState),
@@ -411,6 +416,8 @@ export function useSettings() {
     setSummaryModel: syncedSetSummaryModel,
     summaryAuto,
     setSummaryAuto: syncedSetSummaryAuto,
+    summaryTargetLang,
+    setSummaryTargetLang: syncedSetSummaryTargetLang,
     translateAuto,
     setTranslateAuto: syncedSetTranslateAuto,
     translateProvider,
