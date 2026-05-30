@@ -3,10 +3,11 @@ import { useStreamingAI } from './use-streaming-ai'
 import type { useMetrics } from './use-metrics'
 import type { Article } from '../../shared/types'
 
-type ViewMode = 'translated' | 'original'
+export type ViewMode = 'original' | 'translated' | 'immersive'
 
 const STREAMING_OPTIONS = {
-  endpoint: (id: number) => `/api/articles/${id}/translate?stream=1`,
+  endpoint: (id: number, force?: boolean) =>
+    `/api/articles/${id}/translate?stream=1${force ? '&force=1' : ''}`,
 } as const
 
 export function useTranslate(
@@ -22,7 +23,7 @@ export function useTranslate(
       setFullTextTranslated(article.full_text_translated)
       if (initializedIdRef.current !== article.id) {
         initializedIdRef.current = article.id
-        setViewMode(article.full_text_translated ? 'translated' : 'original')
+        setViewMode(article.full_text_translated ? 'immersive' : 'original')
       }
     }
   }, [article])
@@ -31,14 +32,14 @@ export function useTranslate(
     ...STREAMING_OPTIONS,
     onComplete: (text: string) => {
       setFullTextTranslated(text)
-      setViewMode('translated')
+      setViewMode('immersive')
     },
   }), [])
 
   const { processing: translating, streamingText: translatingText, streamingHtml: translatingHtml, error, run } =
     useStreamingAI(article?.id, metrics, options)
 
-  const handleTranslate = useCallback(() => run(), [run])
+  const handleTranslate = useCallback((force = false) => run(force), [run])
 
   return { viewMode, setViewMode, translating, translatingText, fullTextTranslated, handleTranslate, translatingHtml, error }
 }

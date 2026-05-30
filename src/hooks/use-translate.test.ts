@@ -41,12 +41,12 @@ describe('useTranslate', () => {
     expect(result.current.fullTextTranslated).toBe('翻訳済みテキスト')
   })
 
-  it('sets viewMode to ja when translation exists', () => {
+  it('sets viewMode to immersive when translation exists', () => {
     const metrics = mockMetrics()
     const { result } = renderHook(() =>
       useTranslate({ id: 1, full_text_translated: '翻訳' }, metrics),
     )
-    expect(result.current.viewMode).toBe('translated')
+    expect(result.current.viewMode).toBe('immersive')
   })
 
   it('defaults viewMode to original when no translation', () => {
@@ -92,7 +92,7 @@ describe('useTranslate', () => {
     })
 
     expect(result.current.fullTextTranslated).toBe('完成した翻訳')
-    expect(result.current.viewMode).toBe('translated')
+    expect(result.current.viewMode).toBe('immersive')
   })
 
   it('reports metrics when input_tokens > 0', async () => {

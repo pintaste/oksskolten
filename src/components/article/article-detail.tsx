@@ -21,12 +21,50 @@ import { formatDetailDate } from '../../lib/dateFormat'
 import { useAppLayout } from '../../app'
 import { Skeleton } from '../ui/skeleton'
 import { Callout } from '../ui/callout'
+import { SanitizedHTML } from '../ui/sanitized-html'
 import { ArticleToolbar } from './article-toolbar'
 import { ArticleSummarySection } from './article-summary-section'
 import { ArticleTranslationBanner } from './article-translation-banner'
 import { ArticleContentBody } from './article-content-body'
 import { ArticleSimilarBanner } from './article-similar-banner'
 import type { ArticleDetail as ArticleDetailData } from '../../../shared/types'
+
+/** Split markdown into paragraph chunks, keeping fenced code blocks intact. */
+function splitParagraphs(md: string): string[] {
+  const chunks: string[] = []
+  const parts = md.split(/(```[\s\S]*?```)/g)
+  let current = ''
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2 === 1) {
+      current += parts[i]
+    } else {
+      const segments = parts[i].split(/\n\n+/)
+      for (let j = 0; j < segments.length; j++) {
+        if (j === 0) {
+          current += segments[j]
+        } else {
+          if (current.trim()) chunks.push(current.trim())
+          current = segments[j]
+        }
+      }
+    }
+  }
+  if (current.trim()) chunks.push(current.trim())
+  return chunks
+}
+
+/**
+ * Returns true when the paragraph contains only media elements (images, figures)
+ * and should be rendered standalone in immersive mode without a translation pair.
+ */
+function isMediaParagraph(md: string): boolean {
+  const stripped = md.trim()
+  // Remove markdown images: ![alt](url)
+  const withoutMdImages = stripped.replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+  // Remove HTML img / picture / figure / video tags
+  const withoutHtmlMedia = withoutMdImages.replace(/<(img|picture|figure|video|source)\b[^>]*\/?>/gi, '')
+  return withoutHtmlMedia.trim() === ''
+}
 
 interface ArticleDetailProps {
   articleUrl: string
@@ -114,6 +152,32 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
 
   const content = useMemo(() => {
     if (!article) return ''
+
+    // While translating, always show original so the streaming callout is the focus
+    if (translating) {
+      return sanitizeHtml(renderMarkdown(article.full_text || ''))
+    }
+
+    if (viewMode === 'immersive' && fullTextTranslated && !isUserLang) {
+      const originalParas = splitParagraphs(article.full_text || '')
+      const translatedParas = splitParagraphs(fullTextTranslated)
+      let translatedIdx = 0
+      let html = ''
+      for (const para of originalParas) {
+        if (isMediaParagraph(para)) {
+          // Render media elements at full opacity without a translation pair
+          html += `<div class="immersive-media">${sanitizeHtml(renderMarkdown(para))}</div>`
+        } else {
+          html += `<div class="immersive-source">${sanitizeHtml(renderMarkdown(para))}</div>`
+          if (translatedParas[translatedIdx]) {
+            html += `<div class="immersive-translation">${sanitizeHtml(renderMarkdown(translatedParas[translatedIdx]))}</div>`
+            translatedIdx++
+          }
+        }
+      }
+      return html
+    }
+
     let md = ''
     if (viewMode === 'translated' && !isUserLang) {
       md = fullTextTranslated || ''
@@ -122,7 +186,7 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
     }
     if (!md) return `<p class="text-muted">${t('article.noContent')}</p>`
     return sanitizeHtml(renderMarkdown(md))
-  }, [article, viewMode, isUserLang, fullTextTranslated, t])
+  }, [article, viewMode, isUserLang, fullTextTranslated, translating, t])
 
   const { rewrittenHtml: displayContent } = useRewriteInternalLinks(
     content,
@@ -215,7 +279,6 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
         chatPosition={chatPosition}
         chatOpen={chat.open}
         onChatToggle={chat.toggle}
-        isUserLang={isUserLang}
         hasTranslation={hasTranslation}
         translating={translating}
         onTranslate={handleTranslate}
@@ -275,20 +338,28 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
       )}
 
       {/* Language banner */}
-      {!isUserLang && hasTranslation && (
+      {!isUserLang && hasTranslation && !translating && (
         <ArticleTranslationBanner
           viewMode={viewMode}
-          onToggle={() => setViewMode(viewMode === 'translated' ? 'original' : 'translated')}
+          onSetMode={setViewMode}
         />
       )}
 
+      {/* Translation streaming callout */}
+      {translating && translatingText && (
+        <Callout>
+          <SanitizedHTML html={translatingHtml} className="prose prose-sm" />
+        </Callout>
+      )}
+      {translating && !translatingText && (
+        <Callout>
+          <Skeleton className="h-4 w-3/4 mb-2" />
+          <Skeleton className="h-4 w-1/2" />
+        </Callout>
+      )}
+
       {/* Content */}
-      <ArticleContentBody
-        translating={translating}
-        translatingText={translatingText}
-        translatingHtml={translatingHtml}
-        displayContent={displayContent}
-      />
+      <ArticleContentBody displayContent={displayContent} />
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </article>
     {chatPosition === 'fab' && article && <ChatFab key={article.id} articleId={article.id} />}

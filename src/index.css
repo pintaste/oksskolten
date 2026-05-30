@@ -285,3 +285,21 @@ body {
 .prose ol li {
   list-style-type: decimal;
 }
+
+/* Immersive translation mode */
+.prose .immersive-source > * {
+  opacity: 0.5;
+  font-size: 0.875em;
+}
+
+.prose .immersive-translation {
+  border-left: 2px solid var(--color-accent);
+  padding-left: 0.75rem;
+  margin-top: 0.125rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Media paragraphs (images, figures) in immersive mode: full opacity, no pairing */
+.prose .immersive-media {
+  margin-bottom: 1.25rem;
+}
