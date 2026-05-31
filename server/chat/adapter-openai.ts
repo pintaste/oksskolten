@@ -86,23 +86,30 @@ function convertResponseToNeutral(
   return content
 }
 
-export async function runOpenAITurn(params: ChatTurnParams, externalClient?: OpenAI): Promise<RunChatTurnResult> {
+export async function runOpenAITurn(
+  params: ChatTurnParams,
+  externalClient?: OpenAI,
+  opts?: { noTools?: boolean },
+): Promise<RunChatTurnResult> {
   if (!externalClient && !getSetting('api_key.openai')) {
     throw new Error('OPENAI_KEY_NOT_SET')
   }
 
   const { system, model } = params
   const client = externalClient ?? getOpenAIClient()
-  const tools = toOpenAITools()
+  // Non-default clients (Mimo, DeepSeek, custom) may not support function calling
+  const tools = opts?.noTools ? undefined : toOpenAITools()
+  // OpenAI o1+ uses max_completion_tokens; OpenAI-compatible providers use max_tokens
+  const tokenParam = externalClient ? { max_tokens: CHAT_MAX_TOKENS } : { max_completion_tokens: CHAT_MAX_TOKENS }
 
   return runToolLoop(params, async (allMessages, onEvent) => {
     const openaiMessages = convertMessagesToOpenAI(allMessages, system)
 
     const stream = await client.chat.completions.create({
       model,
-      max_completion_tokens: CHAT_MAX_TOKENS,
+      ...tokenParam,
       messages: openaiMessages,
-      tools,
+      ...(tools ? { tools } : {}),
       stream: true,
       stream_options: { include_usage: true },
     })

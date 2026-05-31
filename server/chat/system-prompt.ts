@@ -8,14 +8,18 @@ function getUserLanguage(): string {
   return getSetting('general.language') || DEFAULT_LANGUAGE
 }
 
-export function buildSystemPrompt(context?: 'home'): string {
+export function buildSystemPrompt(context?: 'home', opts?: { hasTools?: boolean }): string {
+  const hasTools = opts?.hasTools ?? true
   const today = new Date().toISOString().slice(0, 10)
   const lang = getUserLanguage()
   let prompt = `You are an AI assistant for an RSS reader application.
 Today's date is ${today}. Interpret relative time expressions like "this week" or "recently" based on this date.
-You can use tools to retrieve articles and feed information from the database.
 Respond in Markdown format, concisely and accurately.
-IMPORTANT: Always respond in the same language the user writes in. Even if the article content is in a different language, match your response language to the user's message — not the article. If the user's language cannot be determined from their message, default to: ${languageName(lang)}.
+IMPORTANT: Always respond in the same language the user writes in. Even if the article content is in a different language, match your response language to the user's message — not the article. If the user's language cannot be determined from their message, default to: ${languageName(lang)}.`
+
+  if (hasTools) {
+    prompt += `
+You can use tools to retrieve articles and feed information from the database.
 For article links, always use the url field returned by tools as-is (app-internal path like /example.com/...). Never convert to external URLs or prepend https://. Example: [Article Title](/example.com/path/to/article)
 
 ## Recommendation guidelines
@@ -35,6 +39,14 @@ For article links, always use the url field returned by tools as-is (app-interna
 ## Response style
 - When listing articles, include the beginning of the summary so the user can judge whether it's worth reading
 - Never end with just "not found" — suggest alternatives or retry with relaxed criteria`
+  } else {
+    prompt += `
+Answer based only on the article context provided below. Do not attempt to call any tools or functions.
+
+## Response style
+- Be concise and accurate
+- If the user asks about something not covered in the provided context, say so clearly`
+  }
 
   if (context === 'home') {
     prompt += `\n\nThe user is chatting from the article list (home screen). There is no specific article context.

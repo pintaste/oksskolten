@@ -42,6 +42,21 @@ export async function runChatTurn(provider: string, params: ChatTurnParams): Pro
     const { runOpenAITurn } = await import('./adapter-openai.js')
     return runOpenAITurn(params)
   }
+  if (provider === 'deepseek') {
+    const { runOpenAITurn } = await import('./adapter-openai.js')
+    const { getDeepSeekClient } = await import('../providers/llm/deepseek.js')
+    return runOpenAITurn(params, getDeepSeekClient(), { noTools: true })
+  }
+  if (provider === 'mimo') {
+    const { runOpenAITurn } = await import('./adapter-openai.js')
+    const { getMimoClient } = await import('../providers/llm/mimo.js')
+    return runOpenAITurn(params, getMimoClient(), { noTools: true })
+  }
+  if (provider === 'custom' || provider.startsWith('custom-')) {
+    const { runOpenAITurn } = await import('./adapter-openai.js')
+    const { getCustomClient } = await import('../providers/llm/custom.js')
+    return runOpenAITurn(params, getCustomClient(provider === 'custom' ? undefined : provider), { noTools: true })
+  }
   if (provider === 'gemini') {
     const { runGeminiTurn } = await import('./adapter-gemini.js')
     return runGeminiTurn(params)
