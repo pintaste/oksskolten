@@ -11,8 +11,22 @@ import {
   getArticlesByIds,
   markArticleSeen,
   markArticlesSeen,
+  markArticlesUnseen,
+  markAllSeenByFeed,
+  markAllSeenGlobal,
+  markAllSeenByCategory,
+  markAllUnseenByFeed,
+  markAllUnseenGlobal,
+  markAllUnseenByCategory,
   recordArticleRead,
   markArticleBookmarked,
+  batchMarkBookmarked,
+  clearAllBookmarks,
+  batchMarkLiked,
+  clearAllLikes,
+  batchDeleteArticles,
+  clearArticlesByFeed,
+  clearAllHistory,
   markArticleLiked,
   updateArticleContent,
   updateScore,
@@ -105,6 +119,7 @@ const BookmarkBody = z.object({ bookmarked: z.boolean({ message: 'bookmarked mus
 const LikeBody = z.object({ liked: z.boolean({ message: 'liked must be a boolean' }) })
 const BatchSeenBody = z.object({
   ids: z.array(z.number()).min(1, 'ids must be a non-empty array').max(MAX_BATCH_SEEN, `Maximum ${MAX_BATCH_SEEN} ids per request`),
+  seen: z.boolean().default(true),
 })
 const StreamQuery = z.object({
   stream: z.string().optional(),
@@ -434,8 +449,105 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const body = parseOrBadRequest(BatchSeenBody, request.body, reply)
       if (!body) return
-      const result = markArticlesSeen(body.ids)
+      const result = body.seen ? markArticlesSeen(body.ids) : markArticlesUnseen(body.ids)
       reply.send(result)
+    },
+  )
+
+  api.post(
+    '/api/articles/mark-all-seen',
+    { preHandler: [requireJson] },
+    async (request, reply) => {
+      const body = z.object({
+        feed_id: z.number().int().optional(),
+        category_id: z.number().int().optional(),
+        seen: z.boolean().default(true),
+      }).parse(request.body)
+      if (body.seen) {
+        if (body.feed_id) reply.send(markAllSeenByFeed(body.feed_id))
+        else if (body.category_id) reply.send(markAllSeenByCategory(body.category_id))
+        else reply.send(markAllSeenGlobal())
+      } else {
+        if (body.feed_id) reply.send(markAllUnseenByFeed(body.feed_id))
+        else if (body.category_id) reply.send(markAllUnseenByCategory(body.category_id))
+        else reply.send(markAllUnseenGlobal())
+      }
+    },
+  )
+
+  api.post(
+    '/api/articles/batch-like',
+    { preHandler: [requireJson] },
+    async (request, reply) => {
+      const body = parseOrBadRequest(
+        z.object({ ids: z.array(z.number().int()), liked: z.boolean() }),
+        request.body, reply,
+      )
+      if (!body) return
+      batchMarkLiked(body.ids, body.liked)
+      reply.send({ ok: true })
+    },
+  )
+
+  api.post(
+    '/api/articles/clear-likes',
+    async (_request, reply) => {
+      clearAllLikes()
+      reply.send({ ok: true })
+    },
+  )
+
+  api.post(
+    '/api/articles/batch-delete',
+    { preHandler: [requireJson] },
+    async (request, reply) => {
+      const body = parseOrBadRequest(
+        z.object({ ids: z.array(z.number().int()) }),
+        request.body, reply,
+      )
+      if (!body) return
+      batchDeleteArticles(body.ids)
+      reply.send({ ok: true })
+    },
+  )
+
+  api.post(
+    '/api/articles/clear-feed/:feedId',
+    async (request, reply) => {
+      const params = parseOrBadRequest(NumericIdParams, request.params, reply)
+      if (!params) return
+      clearArticlesByFeed(params.id)
+      reply.send({ ok: true })
+    },
+  )
+
+  api.post(
+    '/api/articles/clear-history',
+    async (_request, reply) => {
+      clearAllHistory()
+      reply.send({ ok: true })
+    },
+  )
+
+  api.post(
+    '/api/articles/batch-bookmark',
+    { preHandler: [requireJson] },
+    async (request, reply) => {
+      const body = parseOrBadRequest(
+        z.object({ ids: z.array(z.number().int()), bookmarked: z.boolean() }),
+        request.body, reply,
+      )
+      if (!body) return
+      batchMarkBookmarked(body.ids, body.bookmarked)
+      reply.send({ ok: true })
+    },
+  )
+
+  api.post(
+    '/api/articles/clear-bookmarks',
+    async (_request, reply) => {
+      clearAllBookmarks()
+      reply.send({ ok: true })
     },
   )
 

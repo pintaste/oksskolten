@@ -194,7 +194,10 @@ export function getArticles(opts: {
     SELECT a.id, a.feed_id, f.name AS feed_name,
            a.title, a.url, a.published_at, a.lang, a.summary, a.excerpt, a.og_image, a.seen_at, a.read_at, a.bookmarked_at, a.liked_at,
            a.score,
-           (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count
+           (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count,
+           CASE WHEN a.full_text IS NOT NULL AND LENGTH(a.full_text) > 200
+                THEN CAST((LENGTH(a.full_text) + 999) / 1000 AS INTEGER)
+                ELSE NULL END AS reading_time_mins
     FROM active_articles a
     JOIN feeds f ON a.feed_id = f.id
     ${where}
@@ -263,13 +266,61 @@ export function markArticlesSeen(ids: number[]): { updated: number } {
 }
 
 export function markAllSeenByFeed(feedId: number): { updated: number } {
-  // Collect affected IDs before update for search sync
   const affectedIds = (getDb().prepare(
     'SELECT id FROM active_articles WHERE feed_id = ? AND seen_at IS NULL',
   ).all(feedId) as { id: number }[]).map(r => r.id)
   const result = getDb().prepare("UPDATE articles SET seen_at = datetime('now') WHERE feed_id = ? AND seen_at IS NULL AND purged_at IS NULL").run(feedId)
   if (affectedIds.length > 0) {
     syncArticleFiltersToSearch(affectedIds.map(id => ({ id, is_unread: false })))
+  }
+  return { updated: result.changes }
+}
+
+export function markAllSeenGlobal(): { updated: number } {
+  const affectedIds = (getDb().prepare(
+    'SELECT id FROM active_articles WHERE seen_at IS NULL',
+  ).all() as { id: number }[]).map(r => r.id)
+  const result = getDb().prepare("UPDATE articles SET seen_at = datetime('now') WHERE seen_at IS NULL AND purged_at IS NULL").run()
+  if (affectedIds.length > 0) {
+    syncArticleFiltersToSearch(affectedIds.map(id => ({ id, is_unread: false })))
+  }
+  return { updated: result.changes }
+}
+
+export function markArticlesUnseen(ids: number[]): { updated: number } {
+  if (ids.length === 0) return { updated: 0 }
+  const placeholders = ids.map(() => '?').join(',')
+  const result = getDb().prepare(
+    `UPDATE articles SET seen_at = NULL, read_at = NULL WHERE id IN (${placeholders}) AND seen_at IS NOT NULL`,
+  ).run(...ids)
+  if (result.changes > 0) {
+    syncArticleFiltersToSearch(ids.map(id => ({ id, is_unread: true })))
+  }
+  return { updated: result.changes }
+}
+
+export function markAllUnseenByFeed(feedId: number): { updated: number } {
+  const affectedIds = (getDb().prepare(
+    'SELECT id FROM active_articles WHERE feed_id = ? AND seen_at IS NOT NULL',
+  ).all(feedId) as { id: number }[]).map(r => r.id)
+  const result = getDb().prepare(
+    'UPDATE articles SET seen_at = NULL, read_at = NULL WHERE feed_id = ? AND seen_at IS NOT NULL AND purged_at IS NULL',
+  ).run(feedId)
+  if (affectedIds.length > 0) {
+    syncArticleFiltersToSearch(affectedIds.map(id => ({ id, is_unread: true })))
+  }
+  return { updated: result.changes }
+}
+
+export function markAllUnseenGlobal(): { updated: number } {
+  const affectedIds = (getDb().prepare(
+    'SELECT id FROM active_articles WHERE seen_at IS NOT NULL',
+  ).all() as { id: number }[]).map(r => r.id)
+  const result = getDb().prepare(
+    'UPDATE articles SET seen_at = NULL, read_at = NULL WHERE seen_at IS NOT NULL AND purged_at IS NULL',
+  ).run()
+  if (affectedIds.length > 0) {
+    syncArticleFiltersToSearch(affectedIds.map(id => ({ id, is_unread: true })))
   }
   return { updated: result.changes }
 }
@@ -291,6 +342,17 @@ export function markArticleLiked(
   syncArticleFiltersToSearch([{ id, is_liked: liked }])
   if (!row) return undefined
   return { liked_at: row.liked_at }
+}
+
+export function batchMarkLiked(ids: number[], liked: boolean): void {
+  if (ids.length === 0) return
+  const placeholders = ids.map(() => '?').join(',')
+  const value = liked ? "datetime('now')" : 'NULL'
+  getDb().prepare(`UPDATE articles SET liked_at = ${value} WHERE id IN (${placeholders})`).run(...ids)
+}
+
+export function clearAllLikes(): void {
+  getDb().prepare('UPDATE articles SET liked_at = NULL WHERE liked_at IS NOT NULL').run()
 }
 
 export function getLikeCount(): number {
@@ -315,6 +377,17 @@ export function markArticleBookmarked(
   syncArticleFiltersToSearch([{ id, is_bookmarked: bookmarked }])
   if (!row) return undefined
   return { bookmarked_at: row.bookmarked_at }
+}
+
+export function batchMarkBookmarked(ids: number[], bookmarked: boolean): void {
+  if (ids.length === 0) return
+  const placeholders = ids.map(() => '?').join(',')
+  const value = bookmarked ? "datetime('now')" : 'NULL'
+  getDb().prepare(`UPDATE articles SET bookmarked_at = ${value} WHERE id IN (${placeholders})`).run(...ids)
+}
+
+export function clearAllBookmarks(): void {
+  getDb().prepare('UPDATE articles SET bookmarked_at = NULL WHERE bookmarked_at IS NOT NULL').run()
 }
 
 export function getBookmarkCount(): number {
@@ -578,6 +651,24 @@ export function markImagesArchived(articleId: number): void {
 
 export function clearImagesArchived(articleId: number): void {
   getDb().prepare('UPDATE articles SET images_archived_at = NULL WHERE id = ?').run(articleId)
+}
+
+export function batchDeleteArticles(ids: number[]): void {
+  if (ids.length === 0) return
+  const placeholders = ids.map(() => '?').join(',')
+  getDb().prepare(`DELETE FROM articles WHERE id IN (${placeholders})`).run(...ids)
+  deleteArticlesFromSearch(ids)
+}
+
+export function clearArticlesByFeed(feedId: number): void {
+  const ids = (getDb().prepare('SELECT id FROM articles WHERE feed_id = ?').all(feedId) as { id: number }[]).map(r => r.id)
+  if (ids.length === 0) return
+  getDb().prepare('DELETE FROM articles WHERE feed_id = ?').run(feedId)
+  deleteArticlesFromSearch(ids)
+}
+
+export function clearAllHistory(): void {
+  getDb().prepare('UPDATE articles SET seen_at = NULL WHERE seen_at IS NOT NULL').run()
 }
 
 export function deleteArticle(id: number): boolean {

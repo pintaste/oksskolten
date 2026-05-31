@@ -73,6 +73,28 @@ const dict = {
   'articles.empty': { ja: '記事がありません', en: 'No articles', zh: '暂无文章'},
   'articles.allRead': { ja: 'すべて読みました', en: 'All caught up!', zh: '全部读完了！'},
   'articles.showReadArticles': { ja: '既読記事を表示する', en: 'Show read articles', zh: '显示已读文章'},
+  'articles.markAllRead': { ja: 'すべて既読', en: 'Mark all read', zh: '全部已读'},
+  'articles.markAllUnread': { ja: 'すべて未読', en: 'Mark all unread', zh: '全部未读'},
+  'articles.unreadOnly': { ja: '未読のみ', en: 'Unread only', zh: '仅未读'},
+  'articles.showAll': { ja: 'すべて表示', en: 'Show all', zh: '显示全部'},
+  'articles.markRead': { ja: '既読にする', en: 'Mark read', zh: '标为已读'},
+  'articles.markUnread': { ja: '未読にする', en: 'Mark unread', zh: '标为未读'},
+  'articles.openExternal': { ja: '外部リンク', en: 'Open external', zh: '打开外链'},
+  'articles.readingTime': { ja: '${n}分', en: '${n} min', zh: '${n} 分钟'},
+  'articles.selectedCount': { ja: '${n}件選択', en: '${n} selected', zh: '已选 ${n} 条'},
+  'articles.cancelSelection': { ja: '選択解除', en: 'Cancel', zh: '取消选择'},
+  'articles.selectAll': { ja: 'すべて選択', en: 'Select all', zh: '全选'},
+  'articles.multiSelect': { ja: '複数選択', en: 'Select', zh: '批量选择'},
+  'articles.clearBookmarks': { ja: 'ブックマーク削除', en: 'Clear all', zh: '清空书签'},
+  'articles.batchRemoveBookmark': { ja: 'ブックマーク解除', en: 'Remove', zh: '移除书签'},
+  'articles.clearLikes': { ja: 'いいね削除', en: 'Clear all', zh: '清空点赞'},
+  'articles.batchRemoveLike': { ja: 'いいね解除', en: 'Unlike', zh: '取消点赞'},
+  'articles.clearClips': { ja: 'クリップ削除', en: 'Clear all', zh: '清空剪藏'},
+  'articles.batchRemoveClip': { ja: 'クリップ解除', en: 'Remove', zh: '移除剪藏'},
+  'articles.clearHistory': { ja: '履歴削除', en: 'Clear history', zh: '清空历史'},
+  'articles.batchMarkUnreadFromHistory': { ja: '未読にする', en: 'Mark unread', zh: '标为未读'},
+  'chat.clearAll': { ja: '全削除', en: 'Clear all', zh: '清空聊天'},
+  'chat.batchDelete': { ja: '選択削除', en: 'Delete', zh: '删除所选'},
 
   // FeedErrorBanner - pipeline stages
   'feedError.stage.discovery': { ja: 'RSS検出', en: 'RSS Discovery', zh: 'RSS 发现'},
@@ -939,6 +961,9 @@ const dict = {
   'toast.fetchError': { ja: '${name}: フェッチに失敗しました', en: '${name}: Fetch failed', zh: '${name}：获取失败'},
   'toast.newVersion': { ja: '新しいバージョンが利用可能です', en: 'A new version is available', zh: '有新版本可用'},
   'toast.reload': { ja: '更新', en: 'Reload', zh: '重新加载'},
+  'toast.undo': { ja: '元に戻す', en: 'Undo', zh: '撤销'},
+  'toast.markedAllRead': { ja: 'すべて既読にしました', en: 'Marked all as read', zh: '已全部标为已读'},
+  'toast.markedAllUnread': { ja: 'すべて未読にしました', en: 'Marked all as unread', zh: '已全部标为未读'},
 } as const
 
 type MessageKey = keyof typeof dict

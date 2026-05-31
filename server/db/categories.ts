@@ -62,3 +62,16 @@ export function markAllSeenByCategory(categoryId: number): { updated: number } {
   }
   return { updated: result.changes }
 }
+
+export function markAllUnseenByCategory(categoryId: number): { updated: number } {
+  const affectedIds = (getDb().prepare(
+    'SELECT id FROM active_articles WHERE seen_at IS NOT NULL AND category_id = ?',
+  ).all(categoryId) as { id: number }[]).map(r => r.id)
+  const result = getDb().prepare(
+    'UPDATE articles SET seen_at = NULL, read_at = NULL WHERE seen_at IS NOT NULL AND purged_at IS NULL AND category_id = ?',
+  ).run(categoryId)
+  if (affectedIds.length > 0) {
+    syncArticleFiltersToSearch(affectedIds.map(id => ({ id, is_unread: true })))
+  }
+  return { updated: result.changes }
+}

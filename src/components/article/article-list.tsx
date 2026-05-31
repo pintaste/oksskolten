@@ -11,6 +11,7 @@ import { useIsTouchDevice } from '../../hooks/use-is-touch-device'
 import { useClipFeedId } from '../../hooks/use-clip-feed-id'
 import { useAppLayout } from '../../app'
 import { ArticleCard, type ArticleDisplayConfig } from './article-card'
+import { ArticleListToolbar } from './article-list-toolbar'
 import { FeedMetricsBar } from '../feed/feed-metrics-bar'
 import { SwipeableArticleCard } from './swipeable-article-card'
 import { ArticleOverlay } from './article-overlay'
@@ -22,9 +23,65 @@ import { FeedErrorBanner } from '../feed/feed-error-banner'
 import { Skeleton } from '../ui/skeleton'
 import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
 import { useKeyboardNavigation } from '../../hooks/use-keyboard-navigation'
-import { apiPatch } from '../../lib/fetcher'
+import { apiPatch, apiPost } from '../../lib/fetcher'
+import { Trash2, ThumbsDown, BookmarkX, Eye } from 'lucide-react'
 import type { ArticleListItem, FeedWithCounts } from '../../../shared/types'
 import type { LayoutName } from '../../data/layouts'
+
+const TOAST_DURATION = 2000
+const RING_R = 7
+const RING_CIRC = 2 * Math.PI * RING_R
+
+function UndoToast({ id, message, onUndo, duration = TOAST_DURATION }: {
+  id: string | number
+  message: string
+  onUndo: () => Promise<void>
+  duration?: number
+}) {
+  const { t } = useI18n()
+  const circleRef = useRef<SVGCircleElement>(null)
+
+  useEffect(() => {
+    const start = Date.now()
+    let raf: number
+    const tick = () => {
+      const elapsed = Date.now() - start
+      const progress = Math.max(0, 1 - elapsed / duration)
+      if (circleRef.current) {
+        circleRef.current.style.strokeDashoffset = String(RING_CIRC * (1 - progress))
+      }
+      if (elapsed < duration) raf = requestAnimationFrame(tick)
+      else toast.dismiss(id)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [id, duration])
+
+  return (
+    <div className="flex items-center gap-3 w-full px-1 py-0.5 text-sm">
+      <svg width="18" height="18" viewBox="0 0 18 18" className="shrink-0 -rotate-90">
+        <circle cx="9" cy="9" r={RING_R} fill="none" strokeWidth="2" style={{ stroke: 'var(--color-border)' }} />
+        <circle
+          ref={circleRef}
+          cx="9" cy="9" r={RING_R} fill="none" strokeWidth="2"
+          strokeDasharray={RING_CIRC}
+          strokeDashoffset={0}
+          strokeLinecap="round"
+          style={{ stroke: 'var(--color-accent)' }}
+        />
+      </svg>
+      <span className="flex-1">{message}</span>
+      <button
+        type="button"
+        onClick={() => { void onUndo(); toast.dismiss(id) }}
+        className="shrink-0 font-medium hover:underline"
+        style={{ color: 'var(--color-accent)' }}
+      >
+        {t('toast.undo')}
+      </button>
+    </div>
+  )
+}
 
 interface ArticlesResponse {
   articles: ArticleListItem[]
@@ -62,8 +119,9 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const currentFeed = feedId && feedsData ? feedsData.feeds.find(f => f.id === feedId) : undefined
   const categoryId = categoryIdParam ? Number(categoryIdParam) : undefined
   const [showReadArticles, setShowReadArticles] = useState(false)
+  const [unreadFilter, setUnreadFilter] = useState(false)
   const categoryUnreadOnly = !!categoryId && settings.categoryUnreadOnly === 'on'
-  const unreadOnly = isInbox || (categoryUnreadOnly && !showReadArticles)
+  const unreadOnly = isInbox || (categoryUnreadOnly && !showReadArticles) || unreadFilter
   const bookmarkedOnly = isBookmarks
   const likedOnly = isLikes
   const readOnly = isHistory
@@ -80,7 +138,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const { t } = useI18n()
   const { progress, startFeedFetch } = useFetchProgressContext()
   const { mutate: globalMutate } = useSWRConfig()
-  const getKey = (pageIndex: number, previousPageData: ArticlesResponse | null) => {
+  const getKey = useCallback((pageIndex: number, previousPageData: ArticlesResponse | null) => {
     if (previousPageData && !previousPageData.has_more) return null
     const params = new URLSearchParams()
     if (feedId) params.set('feed_id', String(feedId))
@@ -93,7 +151,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     params.set('limit', String(PAGE_SIZE))
     params.set('offset', String(pageIndex * PAGE_SIZE))
     return `/api/articles?${params.toString()}`
-  }
+  }, [feedId, categoryId, unreadOnly, bookmarkedOnly, likedOnly, readOnly, noFloor])
 
   const { data, error, size, setSize, isLoading, isValidating, mutate } = useSWRInfinite<ArticlesResponse>(
     getKey,
@@ -242,6 +300,8 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   // - API calls are batched and flushed every ~1.5 s
   // ---------------------------------------------------------------------------
   const [autoReadIds, setAutoReadIds] = useState<Set<number>>(() => new Set())
+  const autoReadIdsRef = useRef(autoReadIds)
+  autoReadIdsRef.current = autoReadIds
   const observerRef = useRef<IntersectionObserver | null>(null)
   const batchQueue = useRef(new Set<number>())
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -374,8 +434,260 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     setAutoReadIds(new Set())
     setNoFloor(false)
     setShowReadArticles(false)
+    setUnreadFilter(false)
+    setSelectedIds(new Set())
     setFocusedItemId(null)
   }, [feedId, categoryId, setFocusedItemId])
+
+  // ---------------------------------------------------------------------------
+  // Per-card actions (bookmark, mark read/unread, mark all read)
+  // ---------------------------------------------------------------------------
+
+  const handleToggleBookmark = useCallback((article: ArticleListItem) => {
+    const next = !article.bookmarked_at
+    void mutate(
+      pages => pages?.map(page => ({
+        ...page,
+        articles: page.articles.map(a =>
+          a.id === article.id ? { ...a, bookmarked_at: next ? new Date().toISOString() : null } : a
+        ),
+      })),
+      { revalidate: false },
+    )
+    apiPatch(`/api/articles/${article.id}/bookmark`, { bookmarked: next })
+      .then(() => globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds')))
+      .catch(() => mutate())
+  }, [mutate, globalMutate])
+
+  const handleToggleRead = useCallback((article: ArticleListItem) => {
+    const isCurrentlyRead = article.seen_at != null || autoReadIdsRef.current.has(article.id)
+    const next = !isCurrentlyRead
+    if (!next) setAutoReadIds(prev => { const s = new Set(prev); s.delete(article.id); return s })
+    void mutate(
+      pages => pages?.map(page => ({
+        ...page,
+        articles: page.articles.map(a =>
+          a.id === article.id ? { ...a, seen_at: next ? new Date().toISOString() : null } : a
+        ),
+      })),
+      { revalidate: false },
+    )
+    apiPatch(`/api/articles/${article.id}/seen`, { seen: next })
+      .then(() => globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds')))
+      .catch(() => mutate())
+  }, [mutate, globalMutate])
+
+  const handleMarkAllRead = useCallback(async () => {
+    const scope: Record<string, unknown> = {}
+    if (feedId) scope.feed_id = feedId
+    else if (categoryId) scope.category_id = categoryId
+
+    // Snapshot pre-action seen_at for undo
+    const snapshot = new Map(articles.map(a => [a.id, a.seen_at]))
+
+    void mutate(
+      pages => pages?.map(page => ({
+        ...page,
+        articles: page.articles.map(a => ({ ...a, seen_at: a.seen_at ?? new Date().toISOString() })),
+      })),
+      { revalidate: false },
+    )
+    await apiPost('/api/articles/mark-all-seen', { ...scope, seen: true })
+    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+
+    toast.custom((id) => (
+      <UndoToast
+        id={id}
+        message={t('toast.markedAllRead')}
+        onUndo={async () => {
+          void mutate(
+            pages => pages?.map(page => ({
+              ...page,
+              articles: page.articles.map(a => ({ ...a, seen_at: snapshot.get(a.id) ?? null })),
+            })),
+            { revalidate: false },
+          )
+          await apiPost('/api/articles/mark-all-seen', { ...scope, seen: false })
+          void mutate()
+          void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+        }}
+        duration={5000}
+      />
+    ), { duration: Infinity })
+  }, [feedId, categoryId, mutate, globalMutate, articles, t])
+
+  const handleOpenExternal = useCallback((article: ArticleListItem) => {
+    window.open(article.url, '_blank', 'noopener,noreferrer')
+  }, [])
+
+  // Batch selection
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
+  const [selectionActive, setSelectionActive] = useState(false)
+  const isSelectionMode = selectionActive || selectedIds.size > 0
+
+  const handleSelect = useCallback((article: ArticleListItem) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(article.id)) next.delete(article.id)
+      else next.add(article.id)
+      return next
+    })
+  }, [])
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedIds(new Set(articles.map(a => a.id)))
+  }, [articles])
+
+  const handleCancelSelection = useCallback(() => {
+    setSelectedIds(new Set())
+    setSelectionActive(false)
+  }, [])
+
+  const handleBatchMarkRead = useCallback(async () => {
+    const ids = [...selectedIds]
+    setSelectedIds(new Set())
+    void mutate(
+      pages => pages?.map(page => ({
+        ...page,
+        articles: page.articles.map(a =>
+          ids.includes(a.id) ? { ...a, seen_at: new Date().toISOString() } : a
+        ),
+      })),
+      { revalidate: false },
+    )
+    await apiPost('/api/articles/batch-seen', { ids, seen: true })
+    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+  }, [selectedIds, mutate, globalMutate])
+
+  const handleBatchMarkUnread = useCallback(async () => {
+    const ids = [...selectedIds]
+    setSelectedIds(new Set())
+    void mutate(
+      pages => pages?.map(page => ({
+        ...page,
+        articles: page.articles.map(a =>
+          ids.includes(a.id) ? { ...a, seen_at: null } : a
+        ),
+      })),
+      { revalidate: false },
+    )
+    await apiPost('/api/articles/batch-seen', { ids, seen: false })
+    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+  }, [selectedIds, mutate, globalMutate])
+
+  const handleMarkAllUnread = useCallback(async () => {
+    const scope: Record<string, unknown> = {}
+    if (feedId) scope.feed_id = feedId
+    else if (categoryId) scope.category_id = categoryId
+
+    const snapshot = new Map(articles.map(a => [a.id, a.seen_at]))
+
+    void mutate(
+      pages => pages?.map(page => ({
+        ...page,
+        articles: page.articles.map(a => ({ ...a, seen_at: null })),
+      })),
+      { revalidate: false },
+    )
+    await apiPost('/api/articles/mark-all-seen', { ...scope, seen: false })
+    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+
+    toast.custom((id) => (
+      <UndoToast
+        id={id}
+        message={t('toast.markedAllUnread')}
+        onUndo={async () => {
+          void mutate(
+            pages => pages?.map(page => ({
+              ...page,
+              articles: page.articles.map(a => ({ ...a, seen_at: snapshot.get(a.id) ?? null })),
+            })),
+            { revalidate: false },
+          )
+          await apiPost('/api/articles/mark-all-seen', { ...scope, seen: true })
+          void mutate()
+          void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+        }}
+        duration={5000}
+      />
+    ), { duration: Infinity })
+  }, [feedId, categoryId, mutate, globalMutate, articles, t])
+
+  const hasUnread = articles.some(a => a.seen_at == null && !autoReadIds.has(a.id))
+  const handleBatchRemoveBookmark = useCallback(async () => {
+    const ids = [...selectedIds]
+    void mutate(
+      pages => pages?.map(page => ({
+        ...page,
+        articles: page.articles.filter(a => !ids.includes(a.id)),
+      })),
+      { revalidate: false },
+    )
+    setSelectedIds(new Set())
+    setSelectionActive(false)
+    await apiPost('/api/articles/batch-bookmark', { ids, bookmarked: false })
+    void mutate()
+    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+  }, [selectedIds, mutate, globalMutate])
+
+  const handleClearBookmarks = useCallback(async () => {
+    void mutate(pages => pages?.map(page => ({ ...page, articles: [] })), { revalidate: false })
+    await apiPost('/api/articles/clear-bookmarks', {})
+    void mutate()
+    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+  }, [mutate, globalMutate])
+
+  // Likes
+  const handleBatchRemoveLike = useCallback(async () => {
+    const ids = [...selectedIds]
+    void mutate(pages => pages?.map(page => ({ ...page, articles: page.articles.filter(a => !ids.includes(a.id)) })), { revalidate: false })
+    setSelectedIds(new Set()); setSelectionActive(false)
+    await apiPost('/api/articles/batch-like', { ids, liked: false })
+    void mutate()
+    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+  }, [selectedIds, mutate, globalMutate])
+
+  const handleClearLikes = useCallback(async () => {
+    void mutate(pages => pages?.map(page => ({ ...page, articles: [] })), { revalidate: false })
+    await apiPost('/api/articles/clear-likes', {})
+    void mutate()
+    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+  }, [mutate, globalMutate])
+
+  // Clips
+  const handleBatchRemoveClip = useCallback(async () => {
+    const ids = [...selectedIds]
+    void mutate(pages => pages?.map(page => ({ ...page, articles: page.articles.filter(a => !ids.includes(a.id)) })), { revalidate: false })
+    setSelectedIds(new Set()); setSelectionActive(false)
+    await apiPost('/api/articles/batch-delete', { ids })
+    void mutate()
+  }, [selectedIds, mutate])
+
+  const handleClearClips = useCallback(async () => {
+    if (!clipFeedId) return
+    void mutate(pages => pages?.map(page => ({ ...page, articles: [] })), { revalidate: false })
+    await apiPost(`/api/articles/clear-feed/${clipFeedId}`, {})
+    void mutate()
+  }, [clipFeedId, mutate])
+
+  // History
+  const handleBatchMarkUnreadFromHistory = useCallback(async () => {
+    const ids = [...selectedIds]
+    void mutate(pages => pages?.map(page => ({ ...page, articles: page.articles.filter(a => !ids.includes(a.id)) })), { revalidate: false })
+    setSelectedIds(new Set()); setSelectionActive(false)
+    await apiPost('/api/articles/batch-seen', { ids, seen: false })
+    void mutate()
+    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+  }, [selectedIds, mutate, globalMutate])
+
+  const handleClearHistory = useCallback(async () => {
+    void mutate(pages => pages?.map(page => ({ ...page, articles: [] })), { revalidate: false })
+    await apiPost('/api/articles/clear-history', {})
+    void mutate()
+    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+  }, [mutate, globalMutate])
+
+  const showToolbar = !isCollectionView || isBookmarks || isLikes || isHistory || isClips
 
   return (
     <main ref={listRef} className="max-w-2xl mx-auto" role={!isGridLayout ? 'listbox' : undefined}>
@@ -393,6 +705,66 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
 
       {currentFeed && currentFeed.type !== 'clip' && settings.showFeedActivity === 'on' && (
         <FeedMetricsBar feed={currentFeed} />
+      )}
+
+      {showToolbar && !isLoading && (
+        <ArticleListToolbar
+          unreadFilter={unreadFilter}
+          onToggleUnreadFilter={() => setUnreadFilter(f => !f)}
+          showUnreadFilter={!isInbox && !isBookmarks && !isLikes && !isHistory && !isClips}
+          onMarkAllRead={handleMarkAllRead}
+          onMarkAllUnread={handleMarkAllUnread}
+          hasUnread={hasUnread}
+          showMarkAllUnread={!isInbox}
+          selectedCount={selectedIds.size}
+          totalCount={articles.length}
+          onBatchMarkRead={!isBookmarks && !isLikes && !isClips && !isHistory ? handleBatchMarkRead : undefined}
+          onBatchMarkUnread={!isBookmarks && !isLikes && !isClips && !isHistory ? handleBatchMarkUnread : undefined}
+          onBatchAction={
+            isBookmarks ? handleBatchRemoveBookmark :
+            isLikes ? handleBatchRemoveLike :
+            isClips ? handleBatchRemoveClip :
+            isHistory ? handleBatchMarkUnreadFromHistory :
+            undefined
+          }
+          batchActionLabel={
+            isBookmarks ? t('articles.batchRemoveBookmark') :
+            isLikes ? t('articles.batchRemoveLike') :
+            isClips ? t('articles.batchRemoveClip') :
+            isHistory ? t('articles.batchMarkUnreadFromHistory') :
+            undefined
+          }
+          batchActionIcon={
+            isBookmarks ? <BookmarkX size={13} /> :
+            isLikes ? <ThumbsDown size={13} /> :
+            isClips ? <Trash2 size={13} /> :
+            isHistory ? <Eye size={13} /> :
+            undefined
+          }
+          onClearAction={
+            isBookmarks ? handleClearBookmarks :
+            isLikes ? handleClearLikes :
+            isClips ? handleClearClips :
+            isHistory ? handleClearHistory :
+            undefined
+          }
+          clearActionLabel={
+            isBookmarks ? t('articles.clearBookmarks') :
+            isLikes ? t('articles.clearLikes') :
+            isClips ? t('articles.clearClips') :
+            isHistory ? t('articles.clearHistory') :
+            undefined
+          }
+          clearActionIcon={
+            isBookmarks || isLikes || isClips ? <Trash2 size={13} /> :
+            isHistory ? <Trash2 size={13} /> :
+            undefined
+          }
+          onSelectAll={handleSelectAll}
+          onCancelSelection={handleCancelSelection}
+          isSelectionMode={isSelectionMode}
+          onEnterSelectionMode={() => setSelectionActive(true)}
+        />
       )}
 
       {isLoading && <ArticleListSkeleton layout={layout} showThumbnails={displayConfig.showThumbnails} />}
@@ -463,6 +835,12 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             layout,
             isFeatured: layout === 'magazine' && index === 0,
             onClick: handleOverlayOpen,
+            onToggleBookmark: handleToggleBookmark,
+            onToggleRead: handleToggleRead,
+            onOpenExternal: handleOpenExternal,
+            isSelectionMode,
+            isSelected: selectedIds.has(article.id),
+            onSelect: handleSelect,
             ...displayConfig,
           }
           const isKbFocused = focusedItemId === String(article.id)
