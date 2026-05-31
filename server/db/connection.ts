@@ -30,6 +30,7 @@ function openDb(dbUrl: string) {
     : new Database(dbUrl)
   if (!remote) {
     instance.pragma('journal_mode = WAL')
+    instance.pragma('busy_timeout = 5000')
   }
   instance.pragma('foreign_keys = ON')
   return instance
