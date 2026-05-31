@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { ActionChip } from '../ui/action-chip'
 import { ChatInlineTrigger } from '../chat/chat-inline'
-import { Bookmark, ThumbsUp, CloudUpload, CloudCheck, Trash2, Languages, Sparkles } from 'lucide-react'
+import { Bookmark, ThumbsUp, CloudUpload, CloudCheck, Trash2, Languages, Sparkles, Sun, Moon, Monitor } from 'lucide-react'
 import { useI18n } from '../../lib/i18n'
 import type { ArticleDetail } from '../../../shared/types'
 
@@ -23,6 +23,8 @@ interface ArticleToolbarProps {
   onToggleLike: () => void
   onArchiveImages: () => void
   onDelete: () => void
+  colorMode: 'light' | 'dark' | 'system'
+  onToggleColorMode: () => void
 }
 
 export function ArticleToolbar({
@@ -43,6 +45,8 @@ export function ArticleToolbar({
   onToggleLike,
   onArchiveImages,
   onDelete,
+  colorMode,
+  onToggleColorMode,
 }: ArticleToolbarProps) {
   const navigate = useNavigate()
   const { t } = useI18n()
@@ -123,6 +127,9 @@ export function ArticleToolbar({
           {t('article.delete')}
         </ActionChip>
       )}
+      <ActionChip onClick={onToggleColorMode} tooltip={colorMode}>
+        {colorMode === 'dark' ? <Moon className="w-3.5 h-3.5" /> : colorMode === 'light' ? <Sun className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+      </ActionChip>
     </div>
   )
 }

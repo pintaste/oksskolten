@@ -71,7 +71,7 @@ interface ArticleDetailProps {
 }
 
 export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
-  const { settings: { internalLinks, chatPosition, translateProvider, translateModel, translateTargetLang, translateSourceLang, summaryAuto, translateAuto } } = useAppLayout()
+  const { settings: { internalLinks, chatPosition, translateProvider, translateModel, translateTargetLang, translateSourceLang, summaryAuto, translateAuto, colorMode, setColorMode } } = useAppLayout()
   const navigate = useNavigate()
   const { t, tError, isKeyNotSetError, locale } = useI18n()
   const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
@@ -117,6 +117,22 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
     toggleBookmark, toggleLike, handleArchiveImages, handleDelete,
   } = useArticleActions(article, articleKey)
   const chat = useChatInline(article?.id ?? 0)
+
+  // Back-to-top visibility — throttled via RAF to avoid 60fps re-renders
+  const [showBackToTop, setShowBackToTop] = useState(false)
+  useEffect(() => {
+    let ticking = false
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        setShowBackToTop(window.scrollY > 400)
+        ticking = false
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   // Sync translation/summary back into SWR cache so it persists across navigations
   useEffect(() => {
@@ -292,6 +308,8 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
         onToggleLike={toggleLike}
         onArchiveImages={handleArchiveImages}
         onDelete={() => setDeleteConfirmOpen(true)}
+        colorMode={colorMode}
+        onToggleColorMode={() => setColorMode(colorMode === 'dark' ? 'light' : colorMode === 'light' ? 'system' : 'dark')}
       />
 
       {/* Inline Chat Panel */}
@@ -363,6 +381,22 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </article>
     {chatPosition === 'fab' && article && <ChatFab key={article.id} articleId={article.id} />}
+    {showBackToTop && (
+      <button
+        type="button"
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        className={`fixed right-6 z-50 w-12 h-12 rounded-full bg-accent text-accent-text flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity select-none ${
+          chatPosition === 'fab'
+            ? 'bottom-[calc(5rem+var(--safe-area-inset-bottom))]'
+            : 'bottom-[calc(1.5rem+var(--safe-area-inset-bottom))]'
+        }`}
+        aria-label="Back to top"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M8 13V3M3 8l5-5 5 5" />
+        </svg>
+      </button>
+    )}
     {deleteConfirmOpen && (
       <ConfirmDialog
         title={t('article.delete')}
