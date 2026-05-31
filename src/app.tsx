@@ -100,7 +100,6 @@ function AppLayout() {
             theme="system"
             duration={5000}
             position="top-right"
-            richColors
             offset={{
               top: 'calc(var(--safe-area-inset-top) + 24px)',
               right: '24px',
@@ -112,6 +111,14 @@ function AppLayout() {
               right: '16px',
               bottom: 'calc(var(--safe-area-inset-bottom) + 16px)',
               left: '16px',
+            }}
+            toastOptions={{
+              style: {
+                background: 'color-mix(in srgb, var(--color-bg-card) 88%, transparent)',
+                color: 'var(--color-text)',
+                border: '1px solid var(--color-border)',
+                backdropFilter: 'blur(10px)',
+              },
             }}
           />
         </div>
