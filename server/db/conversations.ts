@@ -85,6 +85,16 @@ export function deleteConversation(id: string): boolean {
   return result.changes > 0
 }
 
+export function clearAllConversations(): void {
+  getDb().prepare('DELETE FROM conversations').run()
+}
+
+export function batchDeleteConversations(ids: string[]): void {
+  if (ids.length === 0) return
+  const placeholders = ids.map(() => '?').join(',')
+  getDb().prepare(`DELETE FROM conversations WHERE id IN (${placeholders})`).run(...ids)
+}
+
 // --- Chat message queries ---
 
 export function insertChatMessage(data: {

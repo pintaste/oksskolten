@@ -25,6 +25,8 @@ import {
   getConversations,
   getConversationById,
   deleteConversation,
+  clearAllConversations,
+  batchDeleteConversations,
   deleteChatMessage,
   insertChatMessage,
   getChatMessages,
@@ -92,8 +94,12 @@ export function registerChatApi(app: FastifyInstance): void {
         content: JSON.stringify(userContent),
       })
 
+      // Providers that don't support function calling get a tools-free system prompt
+      const NO_TOOLS_PROVIDERS = new Set(['deepseek', 'mimo', 'custom'])
+      const hasTools = !NO_TOOLS_PROVIDERS.has(backend) && !backend.startsWith('custom-')
+
       // Build system prompt, optionally with article context
-      let systemPrompt = buildSystemPrompt(body.context)
+      let systemPrompt = buildSystemPrompt(body.context, { hasTools })
       if (body.article_id) {
         systemPrompt = appendArticleContext(systemPrompt, body.article_id)
       }
@@ -221,6 +227,19 @@ export function registerChatApi(app: FastifyInstance): void {
         content: JSON.stringify(message.content),
       }))
       reply.send({ messages })
+    })
+
+    // --- DELETE /api/chat/all ---
+    api.delete('/api/chat/all', async (_request, reply) => {
+      clearAllConversations()
+      reply.status(204).send()
+    })
+
+    // --- POST /api/chat/batch-delete ---
+    api.post('/api/chat/batch-delete', { preHandler: [requireJson] }, async (request, reply) => {
+      const { ids } = z.object({ ids: z.array(z.string()) }).parse(request.body)
+      batchDeleteConversations(ids)
+      reply.status(204).send()
     })
 
     // --- DELETE /api/chat/:id ---
