@@ -1,9 +1,48 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import useSWR, { mutate as globalMutate } from 'swr'
 import { Trash2, ListChecks, Check } from 'lucide-react'
 import { fetcher, apiDelete, apiPost } from '../lib/fetcher'
 import { useI18n } from '../lib/i18n'
+import { toast } from 'sonner'
+
+const CHAT_UNDO_DURATION = 2000
+const RING_R = 7, RING_CIRC = 2 * Math.PI * RING_R
+
+function UndoChatToast({ id, message, onUndo, onExpire }: {
+  id: string | number; message: string
+  onUndo: () => void; onExpire: () => Promise<void>
+}) {
+  const { t } = useI18n()
+  const circleRef = useRef<SVGCircleElement>(null)
+  useEffect(() => {
+    const start = Date.now(); let raf: number
+    const tick = () => {
+      const elapsed = Date.now() - start
+      const p = Math.max(0, 1 - elapsed / CHAT_UNDO_DURATION)
+      if (circleRef.current) circleRef.current.style.strokeDashoffset = String(RING_CIRC * (1 - p))
+      if (elapsed < CHAT_UNDO_DURATION) raf = requestAnimationFrame(tick)
+      else { toast.dismiss(id); void onExpire() }
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [id, onExpire])
+  return (
+    <div className="flex items-center gap-3 w-full px-1 py-0.5 text-sm">
+      <svg width="18" height="18" viewBox="0 0 18 18" className="shrink-0 -rotate-90">
+        <circle cx="9" cy="9" r={RING_R} fill="none" strokeWidth="2" style={{ stroke: 'var(--color-border)' }} />
+        <circle ref={circleRef} cx="9" cy="9" r={RING_R} fill="none" strokeWidth="2"
+          strokeDasharray={RING_CIRC} strokeDashoffset={0} strokeLinecap="round"
+          style={{ stroke: 'var(--color-accent)' }} />
+      </svg>
+      <span className="flex-1">{message}</span>
+      <button type="button" onClick={() => { onUndo(); toast.dismiss(id) }}
+        className="shrink-0 font-medium hover:underline" style={{ color: 'var(--color-accent)' }}>
+        {t('toast.undo')}
+      </button>
+    </div>
+  )
+}
 import { ChatPanel } from '../components/chat/chat-panel'
 import { useDateMode } from '../hooks/use-date-mode'
 import { formatDate, formatRelativeDate } from '../lib/dateFormat'
@@ -56,10 +95,21 @@ export function ChatPage() {
     void globalMutate('/api/chat/conversations')
   }, [navigate])
 
-  const handleClearAll = useCallback(async () => {
-    await apiDelete('/api/chat/all')
-    void globalMutate('/api/chat/conversations')
-  }, [])
+  const handleClearAll = useCallback(() => {
+    const snapshot = conversations
+    void globalMutate('/api/chat/conversations', { conversations: [] }, { revalidate: false })
+    toast.custom((id) => (
+      <UndoChatToast
+        id={id}
+        message={t('toast.clearedChat')}
+        onUndo={() => globalMutate('/api/chat/conversations', { conversations: snapshot }, { revalidate: false })}
+        onExpire={async () => {
+          await apiDelete('/api/chat/all')
+          void globalMutate('/api/chat/conversations')
+        }}
+      />
+    ), { duration: Infinity })
+  }, [conversations, t])
 
   const handleBatchDelete = useCallback(async () => {
     const ids = [...selectedIds]

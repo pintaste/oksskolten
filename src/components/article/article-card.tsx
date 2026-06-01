@@ -197,11 +197,6 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onCl
             {isSelected && <Check size={11} className="text-accent-text" strokeWidth={3} />}
           </button>
         )}
-        {indicatorStyle === 'dot' && !isSelectionMode && (
-          <div className="flex items-center w-3 shrink-0">
-            <span className={`w-1.5 h-1.5 rounded-full bg-accent transition-opacity duration-500 ${showIndicator ? 'opacity-100' : 'opacity-0'}`} />
-          </div>
-        )}
         <div className="flex-1 min-w-0">
           <span
             className={`text-[15px] truncate transition-colors duration-500 block ${
@@ -409,11 +404,6 @@ function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, o
           >
             {isSelected && <Check size={9} className="text-accent-text" strokeWidth={3} />}
           </button>
-        )}
-        {indicatorStyle === 'dot' && !isSelectionMode && (
-          <div className="flex items-center w-2.5 shrink-0">
-            <span className={`w-1.5 h-1.5 rounded-full bg-accent transition-opacity duration-500 ${showIndicator ? 'opacity-100' : 'opacity-0'}`} />
-          </div>
         )}
         <span
           className={`text-[14px] truncate flex-1 transition-colors duration-500 ${

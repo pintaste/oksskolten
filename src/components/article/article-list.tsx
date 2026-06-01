@@ -31,10 +31,11 @@ const TOAST_DURATION = 2000
 const RING_R = 7
 const RING_CIRC = 2 * Math.PI * RING_R
 
-function UndoToast({ id, message, onUndo, duration = TOAST_DURATION }: {
+function UndoToast({ id, message, onUndo, onExpire, duration = TOAST_DURATION }: {
   id: string | number
   message: string
   onUndo: () => Promise<void>
+  onExpire?: () => Promise<void>
   duration?: number
 }) {
   const { t } = useI18n()
@@ -50,11 +51,11 @@ function UndoToast({ id, message, onUndo, duration = TOAST_DURATION }: {
         circleRef.current.style.strokeDashoffset = String(RING_CIRC * (1 - progress))
       }
       if (elapsed < duration) raf = requestAnimationFrame(tick)
-      else toast.dismiss(id)
+      else { toast.dismiss(id); void onExpire?.() }
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [id, duration])
+  }, [id, duration, onExpire])
 
   return (
     <div className="flex items-center gap-3 w-full px-1 py-0.5 text-sm">
@@ -106,7 +107,6 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const { settings } = useAppLayout()
   const clipFeedId = useClipFeedId()
 
-  const isInbox = location.pathname === '/inbox'
   const isBookmarks = location.pathname === '/bookmarks'
   const isLikes = location.pathname === '/likes'
   const isHistory = location.pathname === '/history'
@@ -118,12 +118,12 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const currentFeed = feedId && feedsData ? feedsData.feeds.find(f => f.id === feedId) : undefined
   const categoryId = categoryIdParam ? Number(categoryIdParam) : undefined
   const [showReadArticles, setShowReadArticles] = useState(false)
-  const [unreadFilter, setUnreadFilter] = useState(false)
+  const [readFilter, setReadFilter] = useState<'all' | 'unread' | 'read'>('unread')
   const categoryUnreadOnly = !!categoryId && settings.categoryUnreadOnly === 'on'
-  const unreadOnly = isInbox || (categoryUnreadOnly && !showReadArticles) || unreadFilter
+  const unreadOnly = readFilter === 'unread' || (readFilter === 'all' && categoryUnreadOnly && !showReadArticles)
   const bookmarkedOnly = isBookmarks
   const likedOnly = isLikes
-  const readOnly = isHistory
+  const readOnly = isHistory || readFilter === 'read'
   const { autoMarkRead, dateMode, indicatorStyle, layout, articleOpenMode, keyboardNavigation, keybindings } = settings
   const [overlayUrl, setOverlayUrl] = useState<string | null>(null)
   const [noFloor, setNoFloor] = useState(false)
@@ -146,11 +146,11 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     if (bookmarkedOnly) params.set('bookmarked', '1')
     if (likedOnly) params.set('liked', '1')
     if (readOnly) params.set('read', '1')
-    if (noFloor) params.set('no_floor', '1')
+    if (noFloor || readFilter === 'read') params.set('no_floor', '1')
     params.set('limit', String(PAGE_SIZE))
     params.set('offset', String(pageIndex * PAGE_SIZE))
     return `/api/articles?${params.toString()}`
-  }, [feedId, categoryId, unreadOnly, bookmarkedOnly, likedOnly, readOnly, noFloor])
+  }, [feedId, categoryId, unreadOnly, bookmarkedOnly, likedOnly, readOnly, noFloor, readFilter])
 
   const { data, error, size, setSize, isLoading, isValidating, mutate } = useSWRInfinite<ArticlesResponse>(
     getKey,
@@ -443,8 +443,9 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     setAutoReadIds(new Set())
     setNoFloor(false)
     setShowReadArticles(false)
-    setUnreadFilter(false)
+    setReadFilter('unread')
     setSelectedIds(new Set())
+    setSelectionActive(false)
     setFocusedItemId(null)
   }, [feedId, categoryId, setFocusedItemId])
 
@@ -486,14 +487,12 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
       .catch(() => mutate())
   }, [mutate, globalMutate])
 
-  const handleMarkAllRead = useCallback(async () => {
+  const handleMarkAllRead = useCallback(() => {
     const scope: Record<string, unknown> = {}
     if (feedId) scope.feed_id = feedId
     else if (categoryId) scope.category_id = categoryId
 
-    // Snapshot pre-action seen_at for undo
-    const snapshot = new Map(articles.map(a => [a.id, a.seen_at]))
-
+    const snapshot = data
     void mutate(
       pages => pages?.map(page => ({
         ...page,
@@ -501,29 +500,18 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
       })),
       { revalidate: false },
     )
-    await apiPost('/api/articles/mark-all-seen', { ...scope, seen: true })
-    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
-
     toast.custom((id) => (
       <UndoToast
         id={id}
         message={t('toast.markedAllRead')}
-        onUndo={async () => {
-          void mutate(
-            pages => pages?.map(page => ({
-              ...page,
-              articles: page.articles.map(a => ({ ...a, seen_at: snapshot.get(a.id) ?? null })),
-            })),
-            { revalidate: false },
-          )
-          await apiPost('/api/articles/mark-all-seen', { ...scope, seen: false })
-          void mutate()
+        onUndo={async () => { void mutate(() => snapshot, { revalidate: false }) }}
+        onExpire={async () => {
+          await apiPost('/api/articles/mark-all-seen', { ...scope, seen: true })
           void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
         }}
-        duration={5000}
       />
     ), { duration: Infinity })
-  }, [feedId, categoryId, mutate, globalMutate, articles, t])
+  }, [feedId, categoryId, data, mutate, globalMutate, t])
 
   const handleOpenExternal = useCallback((article: ArticleListItem) => {
     markRead(article.id)
@@ -555,7 +543,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
 
   const handleBatchMarkRead = useCallback(async () => {
     const ids = [...selectedIds]
-    setSelectedIds(new Set())
+    setSelectedIds(new Set()); setSelectionActive(false)
     void mutate(
       pages => pages?.map(page => ({
         ...page,
@@ -571,7 +559,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
 
   const handleBatchMarkUnread = useCallback(async () => {
     const ids = [...selectedIds]
-    setSelectedIds(new Set())
+    setSelectedIds(new Set()); setSelectionActive(false)
     void mutate(
       pages => pages?.map(page => ({
         ...page,
@@ -602,12 +590,22 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
   }, [selectedIds, mutate, globalMutate])
 
-  const handleClearBookmarks = useCallback(async () => {
+  const handleClearBookmarks = useCallback(() => {
+    const snapshot = data
     void mutate(pages => pages?.map(page => ({ ...page, articles: [] })), { revalidate: false })
-    await apiPost('/api/articles/clear-bookmarks', {})
-    void mutate()
-    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
-  }, [mutate, globalMutate])
+    toast.custom((id) => (
+      <UndoToast
+        id={id}
+        message={t('toast.clearedBookmarks')}
+        onUndo={async () => { void mutate(() => snapshot, { revalidate: false }) }}
+        onExpire={async () => {
+          await apiPost('/api/articles/clear-bookmarks', {})
+          void mutate()
+          void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+        }}
+      />
+    ), { duration: Infinity })
+  }, [data, mutate, globalMutate, t])
 
   // Likes
   const handleBatchRemoveLike = useCallback(async () => {
@@ -619,12 +617,22 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
   }, [selectedIds, mutate, globalMutate])
 
-  const handleClearLikes = useCallback(async () => {
+  const handleClearLikes = useCallback(() => {
+    const snapshot = data
     void mutate(pages => pages?.map(page => ({ ...page, articles: [] })), { revalidate: false })
-    await apiPost('/api/articles/clear-likes', {})
-    void mutate()
-    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
-  }, [mutate, globalMutate])
+    toast.custom((id) => (
+      <UndoToast
+        id={id}
+        message={t('toast.clearedLikes')}
+        onUndo={async () => { void mutate(() => snapshot, { revalidate: false }) }}
+        onExpire={async () => {
+          await apiPost('/api/articles/clear-likes', {})
+          void mutate()
+          void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+        }}
+      />
+    ), { duration: Infinity })
+  }, [data, mutate, globalMutate, t])
 
   // Clips
   const handleBatchRemoveClip = useCallback(async () => {
@@ -635,12 +643,22 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     void mutate()
   }, [selectedIds, mutate])
 
-  const handleClearClips = useCallback(async () => {
+  const handleClearClips = useCallback(() => {
     if (!clipFeedId) return
+    const snapshot = data
     void mutate(pages => pages?.map(page => ({ ...page, articles: [] })), { revalidate: false })
-    await apiPost(`/api/articles/clear-feed/${clipFeedId}`, {})
-    void mutate()
-  }, [clipFeedId, mutate])
+    toast.custom((id) => (
+      <UndoToast
+        id={id}
+        message={t('toast.clearedClips')}
+        onUndo={async () => { void mutate(() => snapshot, { revalidate: false }) }}
+        onExpire={async () => {
+          await apiPost(`/api/articles/clear-feed/${clipFeedId}`, {})
+          void mutate()
+        }}
+      />
+    ), { duration: Infinity })
+  }, [clipFeedId, data, mutate, t])
 
   // History
   const handleBatchMarkUnreadFromHistory = useCallback(async () => {
@@ -652,12 +670,22 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
   }, [selectedIds, mutate, globalMutate])
 
-  const handleClearHistory = useCallback(async () => {
+  const handleClearHistory = useCallback(() => {
+    const snapshot = data
     void mutate(pages => pages?.map(page => ({ ...page, articles: [] })), { revalidate: false })
-    await apiPost('/api/articles/clear-history', {})
-    void mutate()
-    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
-  }, [mutate, globalMutate])
+    toast.custom((id) => (
+      <UndoToast
+        id={id}
+        message={t('toast.clearedHistory')}
+        onUndo={async () => { void mutate(() => snapshot, { revalidate: false }) }}
+        onExpire={async () => {
+          await apiPost('/api/articles/clear-history', {})
+          void mutate()
+          void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
+        }}
+      />
+    ), { duration: Infinity })
+  }, [data, mutate, globalMutate, t])
 
   const showToolbar = !isCollectionView || isBookmarks || isLikes || isHistory || isClips
 
@@ -677,13 +705,9 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
 
       {showToolbar && !isLoading && (
         <ArticleListToolbar
-          feedStats={currentFeed && currentFeed.type !== 'clip' ? {
-            unreadCount: currentFeed.unread_count,
-            totalCount: currentFeed.article_count,
-          } : undefined}
-          unreadFilter={unreadFilter}
-          onToggleUnreadFilter={() => setUnreadFilter(f => !f)}
-          showUnreadFilter={!isInbox && !isBookmarks && !isLikes && !isHistory && !isClips}
+          readFilter={readFilter}
+          onChangeReadFilter={setReadFilter}
+          showReadFilter={!isBookmarks && !isLikes && !isHistory && !isClips}
           onMarkAllRead={handleMarkAllRead}
           hasUnread={hasUnread}
           selectedCount={selectedIds.size}

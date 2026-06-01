@@ -1,17 +1,13 @@
 import type { ReactNode } from 'react'
-import { CheckCheck, CheckSquare, ListChecks, ListFilter, List } from 'lucide-react'
+import { CheckCheck, CheckSquare, ListChecks, ListFilter, List, Eye } from 'lucide-react'
 import { useI18n } from '../../lib/i18n'
 
-interface FeedStats {
-  unreadCount: number
-  totalCount: number
-}
+type ReadFilter = 'all' | 'unread' | 'read'
 
 interface ArticleListToolbarProps {
-  feedStats?: FeedStats
-  unreadFilter: boolean
-  onToggleUnreadFilter: () => void
-  showUnreadFilter: boolean
+  readFilter: ReadFilter
+  onChangeReadFilter: (f: ReadFilter) => void
+  showReadFilter: boolean
   onMarkAllRead: () => void
   hasUnread: boolean
   selectedCount: number
@@ -31,10 +27,9 @@ interface ArticleListToolbarProps {
 }
 
 export function ArticleListToolbar({
-  feedStats,
-  unreadFilter,
-  onToggleUnreadFilter,
-  showUnreadFilter,
+  readFilter,
+  onChangeReadFilter,
+  showReadFilter,
   onMarkAllRead,
   hasUnread,
   selectedCount,
@@ -121,26 +116,27 @@ export function ArticleListToolbar({
     )
   }
 
-  // Build filter button label: with counts when feedStats available
-  const filterLabel = showUnreadFilter
-    ? unreadFilter
-      ? feedStats ? `${t('articles.showAll')} ${feedStats.totalCount}` : t('articles.showAll')
-      : feedStats ? `${t('articles.unreadOnly')} ${feedStats.unreadCount}/${feedStats.totalCount}` : t('articles.unreadOnly')
-    : null
+  const nextFilter: ReadFilter = readFilter === 'all' ? 'unread' : readFilter === 'unread' ? 'read' : 'all'
+  const filterConfig = {
+    all:    { icon: <List size={13} />,       label: t('articles.showAll'),    active: false },
+    unread: { icon: <ListFilter size={13} />, label: t('articles.unreadOnly'), active: true  },
+    read:   { icon: <Eye size={13} />,        label: t('articles.readOnly'),   active: true  },
+  }
+  const fc = filterConfig[readFilter]
 
   return (
     <div className="flex items-center justify-between px-4 md:px-6 py-1 border-b border-border select-none">
       <div className="flex items-center gap-2">
-        {filterLabel !== null && (
+        {showReadFilter && (
           <button
             type="button"
-            onClick={onToggleUnreadFilter}
+            onClick={() => onChangeReadFilter(nextFilter)}
             className={`inline-flex items-center gap-1 text-xs transition-colors ${
-              unreadFilter ? 'text-accent font-medium' : 'text-muted hover:text-text'
+              fc.active ? 'text-accent font-medium' : 'text-muted hover:text-text'
             }`}
           >
-            {unreadFilter ? <List size={13} /> : <ListFilter size={13} />}
-            {filterLabel}
+            {fc.icon}
+            {fc.label}
           </button>
         )}
       </div>

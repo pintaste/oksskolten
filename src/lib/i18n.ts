@@ -85,6 +85,7 @@ const dict = {
   'articles.cancelSelection': { ja: '選択解除', en: 'Cancel', zh: '取消选择'},
   'articles.selectAll': { ja: 'すべて選択', en: 'Select all', zh: '全选'},
   'articles.multiSelect': { ja: '複数選択', en: 'Select', zh: '批量选择'},
+  'articles.readOnly': { ja: '既読のみ', en: 'Read only', zh: '仅已读'},
   'articles.clearBookmarks': { ja: 'ブックマーク削除', en: 'Clear all', zh: '清空书签'},
   'articles.batchRemoveBookmark': { ja: 'ブックマーク解除', en: 'Remove', zh: '移除书签'},
   'articles.clearLikes': { ja: 'いいね削除', en: 'Clear all', zh: '清空点赞'},
@@ -94,6 +95,11 @@ const dict = {
   'articles.clearHistory': { ja: '履歴削除', en: 'Clear history', zh: '清空历史'},
   'articles.batchMarkUnreadFromHistory': { ja: '未読にする', en: 'Mark unread', zh: '标为未读'},
   'chat.clearAll': { ja: '全削除', en: 'Clear all', zh: '清空聊天'},
+  'toast.clearedBookmarks': { ja: 'ブックマークを削除しました', en: 'Bookmarks cleared', zh: '已清空书签'},
+  'toast.clearedLikes': { ja: 'いいねを削除しました', en: 'Likes cleared', zh: '已清空点赞'},
+  'toast.clearedClips': { ja: 'クリップを削除しました', en: 'Clips cleared', zh: '已清空剪藏'},
+  'toast.clearedHistory': { ja: '履歴を削除しました', en: 'History cleared', zh: '已清空历史'},
+  'toast.clearedChat': { ja: 'チャットを削除しました', en: 'Chats cleared', zh: '已清空聊天'},
   'chat.batchDelete': { ja: '選択削除', en: 'Delete', zh: '删除所选'},
 
   // FeedErrorBanner - pipeline stages
