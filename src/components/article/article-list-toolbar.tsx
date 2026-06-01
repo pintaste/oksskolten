@@ -2,14 +2,18 @@ import type { ReactNode } from 'react'
 import { CheckCheck, CheckSquare, ListChecks, ListFilter, List } from 'lucide-react'
 import { useI18n } from '../../lib/i18n'
 
+interface FeedStats {
+  unreadCount: number
+  totalCount: number
+}
+
 interface ArticleListToolbarProps {
+  feedStats?: FeedStats
   unreadFilter: boolean
   onToggleUnreadFilter: () => void
   showUnreadFilter: boolean
   onMarkAllRead: () => void
-  onMarkAllUnread: () => void
   hasUnread: boolean
-  showMarkAllUnread: boolean
   selectedCount: number
   totalCount: number
   onBatchAction?: () => void
@@ -27,13 +31,12 @@ interface ArticleListToolbarProps {
 }
 
 export function ArticleListToolbar({
+  feedStats,
   unreadFilter,
   onToggleUnreadFilter,
   showUnreadFilter,
   onMarkAllRead,
-  onMarkAllUnread,
   hasUnread,
-  showMarkAllUnread,
   selectedCount,
   totalCount,
   onBatchAction,
@@ -51,7 +54,7 @@ export function ArticleListToolbar({
 }: ArticleListToolbarProps) {
   const { t } = useI18n()
 
-  if (selectedCount > 0) {
+  if (isSelectionMode) {
     return (
       <div
         className="flex items-center justify-between px-4 md:px-6 py-1.5 border-b border-border select-none"
@@ -68,21 +71,18 @@ export function ArticleListToolbar({
           >
             {t('articles.cancelSelection')}
           </button>
+          {selectedCount < totalCount && (
+            <button
+              type="button"
+              onClick={onSelectAll}
+              className="text-xs text-muted hover:text-text transition-colors"
+            >
+              {t('articles.selectAll')}
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
-          {selectedCount < totalCount && (
-            <>
-              <button
-                type="button"
-                onClick={onSelectAll}
-                className="text-xs px-2 py-1 rounded text-muted hover:text-text hover:bg-hover transition-colors"
-              >
-                {t('articles.selectAll')}
-              </button>
-              <span className="text-border text-xs">·</span>
-            </>
-          )}
           {onBatchAction && batchActionLabel ? (
             <button
               type="button"
@@ -121,10 +121,17 @@ export function ArticleListToolbar({
     )
   }
 
+  // Build filter button label: with counts when feedStats available
+  const filterLabel = showUnreadFilter
+    ? unreadFilter
+      ? feedStats ? `${t('articles.showAll')} ${feedStats.totalCount}` : t('articles.showAll')
+      : feedStats ? `${t('articles.unreadOnly')} ${feedStats.unreadCount}/${feedStats.totalCount}` : t('articles.unreadOnly')
+    : null
+
   return (
     <div className="flex items-center justify-between px-4 md:px-6 py-1 border-b border-border select-none">
       <div className="flex items-center gap-2">
-        {showUnreadFilter && (
+        {filterLabel !== null && (
           <button
             type="button"
             onClick={onToggleUnreadFilter}
@@ -133,7 +140,7 @@ export function ArticleListToolbar({
             }`}
           >
             {unreadFilter ? <List size={13} /> : <ListFilter size={13} />}
-            {unreadFilter ? t('articles.showAll') : t('articles.unreadOnly')}
+            {filterLabel}
           </button>
         )}
       </div>
@@ -157,29 +164,17 @@ export function ArticleListToolbar({
             {clearActionLabel}
           </button>
         ) : (
-          <>
-            {showMarkAllUnread && (
-              <button
-                type="button"
-                onClick={onMarkAllUnread}
-                className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors"
-              >
-                <CheckSquare size={13} />
-                {t('articles.markAllUnread')}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onMarkAllRead}
-              disabled={!hasUnread}
-              className={`inline-flex items-center gap-1 text-xs transition-colors ${
-                hasUnread ? 'text-muted hover:text-accent' : 'text-muted/40 cursor-not-allowed'
-              }`}
-            >
-              <CheckCheck size={13} />
-              {t('articles.markAllRead')}
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={onMarkAllRead}
+            disabled={!hasUnread}
+            className={`inline-flex items-center gap-1 text-xs transition-colors ${
+              hasUnread ? 'text-muted hover:text-accent' : 'text-muted/40 cursor-not-allowed'
+            }`}
+          >
+            <CheckCheck size={13} />
+            {t('articles.markAllRead')}
+          </button>
         )}
       </div>
     </div>

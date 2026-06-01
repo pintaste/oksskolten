@@ -12,7 +12,6 @@ import { useClipFeedId } from '../../hooks/use-clip-feed-id'
 import { useAppLayout } from '../../app'
 import { ArticleCard, type ArticleDisplayConfig } from './article-card'
 import { ArticleListToolbar } from './article-list-toolbar'
-import { FeedMetricsBar } from '../feed/feed-metrics-bar'
 import { SwipeableArticleCard } from './swipeable-article-card'
 import { ArticleOverlay } from './article-overlay'
 import { PullToRefresh } from '../layout/pull-to-refresh'
@@ -325,7 +324,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     }, BATCH_FLUSH_INTERVAL)
   }, [flushBatch])
 
-  // Mark an article as read: instant UI update + queue for server batch
+  // Mark an article as read: instant UI update + SWR cache + queue for server batch
   const markRead = useCallback((articleId: number) => {
     setAutoReadIds(prev => {
       if (prev.has(articleId)) return prev
@@ -333,10 +332,20 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
       next.add(articleId)
       return next
     })
+    // Persist into SWR cache so the read state survives page navigation
+    void mutate(
+      pages => pages?.map(page => ({
+        ...page,
+        articles: page.articles.map(a =>
+          a.id === articleId ? { ...a, seen_at: a.seen_at ?? new Date().toISOString() } : a
+        ),
+      })),
+      { revalidate: false },
+    )
     trackRead(articleId)
     batchQueue.current.add(articleId)
     scheduleFlush()
-  }, [scheduleFlush])
+  }, [scheduleFlush, mutate])
 
   // Stable ref so the observer callback always sees the latest markRead
   const markReadRef = useRef(markRead)
@@ -517,8 +526,9 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   }, [feedId, categoryId, mutate, globalMutate, articles, t])
 
   const handleOpenExternal = useCallback((article: ArticleListItem) => {
+    markRead(article.id)
     window.open(article.url, '_blank', 'noopener,noreferrer')
-  }, [])
+  }, [markRead])
 
   // Batch selection
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
@@ -574,44 +584,6 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     await apiPost('/api/articles/batch-seen', { ids, seen: false })
     void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
   }, [selectedIds, mutate, globalMutate])
-
-  const handleMarkAllUnread = useCallback(async () => {
-    const scope: Record<string, unknown> = {}
-    if (feedId) scope.feed_id = feedId
-    else if (categoryId) scope.category_id = categoryId
-
-    const snapshot = new Map(articles.map(a => [a.id, a.seen_at]))
-
-    void mutate(
-      pages => pages?.map(page => ({
-        ...page,
-        articles: page.articles.map(a => ({ ...a, seen_at: null })),
-      })),
-      { revalidate: false },
-    )
-    await apiPost('/api/articles/mark-all-seen', { ...scope, seen: false })
-    void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
-
-    toast.custom((id) => (
-      <UndoToast
-        id={id}
-        message={t('toast.markedAllUnread')}
-        onUndo={async () => {
-          void mutate(
-            pages => pages?.map(page => ({
-              ...page,
-              articles: page.articles.map(a => ({ ...a, seen_at: snapshot.get(a.id) ?? null })),
-            })),
-            { revalidate: false },
-          )
-          await apiPost('/api/articles/mark-all-seen', { ...scope, seen: true })
-          void mutate()
-          void globalMutate((k: string) => typeof k === 'string' && k.startsWith('/api/feeds'))
-        }}
-        duration={5000}
-      />
-    ), { duration: Infinity })
-  }, [feedId, categoryId, mutate, globalMutate, articles, t])
 
   const hasUnread = articles.some(a => a.seen_at == null && !autoReadIds.has(a.id))
   const handleBatchRemoveBookmark = useCallback(async () => {
@@ -703,19 +675,17 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
         }
       }} />}
 
-      {currentFeed && currentFeed.type !== 'clip' && settings.showFeedActivity === 'on' && (
-        <FeedMetricsBar feed={currentFeed} />
-      )}
-
       {showToolbar && !isLoading && (
         <ArticleListToolbar
+          feedStats={currentFeed && currentFeed.type !== 'clip' ? {
+            unreadCount: currentFeed.unread_count,
+            totalCount: currentFeed.article_count,
+          } : undefined}
           unreadFilter={unreadFilter}
           onToggleUnreadFilter={() => setUnreadFilter(f => !f)}
           showUnreadFilter={!isInbox && !isBookmarks && !isLikes && !isHistory && !isClips}
           onMarkAllRead={handleMarkAllRead}
-          onMarkAllUnread={handleMarkAllUnread}
           hasUnread={hasUnread}
-          showMarkAllUnread={!isInbox}
           selectedCount={selectedIds.size}
           totalCount={articles.length}
           onBatchMarkRead={!isBookmarks && !isLikes && !isClips && !isHistory ? handleBatchMarkRead : undefined}
@@ -825,11 +795,14 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
           const effectiveArticle = isAutoRead
             ? { ...article, seen_at: article.seen_at ?? new Date().toISOString() }
             : article
-          const handleOverlayOpen = articleOpenMode === 'overlay' ? (e: React.MouseEvent<HTMLAnchorElement>) => {
+          const handleOverlayOpen = (e: React.MouseEvent<HTMLAnchorElement>) => {
             if (e.metaKey || e.ctrlKey || e.button === 1) return
-            e.preventDefault()
-            setOverlayUrl(article.url)
-          } : undefined
+            markRead(article.id)
+            if (articleOpenMode === 'overlay') {
+              e.preventDefault()
+              setOverlayUrl(article.url)
+            }
+          }
           const cardProps = {
             article: effectiveArticle,
             layout,

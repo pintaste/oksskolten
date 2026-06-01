@@ -8,6 +8,20 @@ import { formatDate, formatRelativeDate } from '../../lib/dateFormat'
 import type { ArticleListItem } from '../../../shared/types'
 import type { LayoutName } from '../../data/layouts'
 
+/** Strip HTML tags and common Markdown syntax from excerpt text for list display */
+function stripMarkup(text: string): string {
+  return text
+    .replace(/<[^>]+>/g, ' ')           // HTML tags
+    .replace(/\*\*(.+?)\*\*/g, '$1')    // bold **...**
+    .replace(/\*(.+?)\*/g, '$1')        // italic *...*
+    .replace(/`(.+?)`/g, '$1')          // inline code
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // [text](url)
+    .replace(/\\([[\]()#*_])/g, '$1')   // escaped chars
+    .replace(/#{1,6}\s+/g, '')          // headings
+    .replace(/\s+/g, ' ')              // collapse whitespace
+    .trim()
+}
+
 export interface ArticleDisplayConfig {
   dateMode: 'relative' | 'absolute'
   indicatorStyle: 'dot' | 'line'
@@ -93,8 +107,9 @@ function CardActions({ article, isUnread, onToggleBookmark, onToggleRead, onOpen
   const stop = (e: React.MouseEvent, cb?: (a: ArticleListItem) => void) => {
     e.preventDefault(); e.stopPropagation(); cb?.(article)
   }
+  const alwaysVisible = !!article.bookmarked_at
   return (
-    <div className="flex items-center gap-0.5 shrink-0 ml-1">
+    <div className={`shrink-0 items-center gap-0.5 ${alwaysVisible ? 'flex' : 'hidden group-hover:flex'}`}>
       {onToggleRead && (
         <button
           type="button"
@@ -197,7 +212,7 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onCl
           </span>
           {article.excerpt && (
             <p className="text-[13px] text-muted truncate mt-0.5">
-              {article.excerpt}
+              {stripMarkup(article.excerpt)}
             </p>
           )}
           <div className="flex items-center gap-1 text-[12px] text-muted mt-1 whitespace-nowrap min-w-0">

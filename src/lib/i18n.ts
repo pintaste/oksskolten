@@ -79,7 +79,7 @@ const dict = {
   'articles.showAll': { ja: 'すべて表示', en: 'Show all', zh: '显示全部'},
   'articles.markRead': { ja: '既読にする', en: 'Mark read', zh: '标为已读'},
   'articles.markUnread': { ja: '未読にする', en: 'Mark unread', zh: '标为未读'},
-  'articles.openExternal': { ja: '外部リンク', en: 'Open external', zh: '打开外链'},
+  'articles.openExternal': { ja: '原文リンク', en: 'Original', zh: '原文链接'},
   'articles.readingTime': { ja: '${n}分', en: '${n} min', zh: '${n} 分钟'},
   'articles.selectedCount': { ja: '${n}件選択', en: '${n} selected', zh: '已选 ${n} 条'},
   'articles.cancelSelection': { ja: '選択解除', en: 'Cancel', zh: '取消选择'},

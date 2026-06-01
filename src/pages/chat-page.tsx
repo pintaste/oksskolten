@@ -106,32 +106,29 @@ export function ChatPage() {
       {conversations.length > 0 && (
         <div
           className="flex items-center justify-between px-4 md:px-6 py-1 border-b border-border select-none"
-          style={selectedIds.size > 0 ? { backgroundColor: 'color-mix(in srgb, var(--color-accent) 6%, var(--color-bg))' } : undefined}
+          style={isSelectionMode ? { backgroundColor: 'color-mix(in srgb, var(--color-accent) 6%, var(--color-bg))' } : undefined}
         >
-          {/* Left: selection count or empty */}
+          {/* Left: selection controls */}
           <div className="flex items-center gap-3">
-            {selectedIds.size > 0 ? (
+            {isSelectionMode ? (
               <>
                 <span className="text-xs font-semibold text-text">{t('articles.selectedCount', { n: String(selectedIds.size) })}</span>
                 <button type="button" onClick={handleCancelSelection} className="text-xs text-muted hover:text-text transition-colors">
                   {t('articles.cancelSelection')}
                 </button>
+                {selectedIds.size < conversations.length && (
+                  <button type="button" onClick={() => setSelectedIds(new Set(conversations.map(c => c.id)))} className="text-xs text-muted hover:text-text transition-colors">
+                    {t('articles.selectAll')}
+                  </button>
+                )}
               </>
             ) : <span />}
           </div>
 
           {/* Right: actions */}
           <div className="flex items-center gap-3">
-            {selectedIds.size > 0 ? (
+            {isSelectionMode ? (
               <>
-                {selectedIds.size < conversations.length && (
-                  <>
-                    <button type="button" onClick={() => setSelectedIds(new Set(conversations.map(c => c.id)))} className="text-xs px-2 py-1 rounded text-muted hover:text-text hover:bg-hover transition-colors">
-                      {t('articles.selectAll')}
-                    </button>
-                    <span className="text-border text-xs">·</span>
-                  </>
-                )}
                 <button type="button" onClick={handleBatchDelete} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded text-muted hover:text-text hover:bg-hover transition-colors">
                   <Trash2 size={13} />
                   {t('chat.batchDelete')}
