@@ -120,7 +120,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const [showReadArticles, setShowReadArticles] = useState(false)
   const [readFilter, setReadFilter] = useState<'all' | 'unread' | 'read'>('unread')
   const categoryUnreadOnly = !!categoryId && settings.categoryUnreadOnly === 'on'
-  const unreadOnly = readFilter === 'unread' || (readFilter === 'all' && categoryUnreadOnly && !showReadArticles)
+  const unreadOnly = !isCollectionView && (readFilter === 'unread' || (readFilter === 'all' && categoryUnreadOnly && !showReadArticles))
   const bookmarkedOnly = isBookmarks
   const likedOnly = isLikes
   const readOnly = isHistory || readFilter === 'read'
