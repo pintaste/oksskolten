@@ -134,15 +134,17 @@ function CardActions({ article, isUnread, onToggleBookmark, onToggleRead, onOpen
           />
         </button>
       )}
-      {onOpenExternal && (
-        <button
-          type="button"
+      {onOpenExternal && article.url && (
+        <a
+          href={article.url}
+          target="_blank"
+          rel="noopener noreferrer"
           title={t('articles.openExternal')}
-          onClick={e => stop(e, onOpenExternal)}
+          onClick={e => { e.stopPropagation(); onOpenExternal(article) }}
           className="p-1 rounded text-muted hover:text-accent hover:bg-hover transition-colors"
         >
           <ExternalLink size={14} />
-        </button>
+        </a>
       )}
     </div>
   )

@@ -240,7 +240,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     },
     onOpenExternal: (id) => {
       const article = articleMap.get(id)
-      if (article?.url) window.open(article.url, '_blank')
+      if (article?.url) { window.open(article.url, '_blank', 'noopener,noreferrer'); window.focus() }
     },
     onNearEnd: () => loadMoreRef.current(),
     enabled: isKeyboardNavEnabled,
@@ -515,7 +515,6 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
 
   const handleOpenExternal = useCallback((article: ArticleListItem) => {
     markRead(article.id)
-    window.open(article.url, '_blank', 'noopener,noreferrer')
   }, [markRead])
 
   // Batch selection
