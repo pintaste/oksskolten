@@ -216,7 +216,7 @@ const dict = {
   'modal.add': { ja: '追加', en: 'Add', zh: '添加'},
   'modal.errorRssNotDetected': { ja: 'このURLからRSSフィードを検出できませんでした', en: 'RSS could not be detected for this URL', zh: '无法从此 URL 检测到 RSS'},
   'modal.errorAlreadyExists': { ja: 'このフィードは既に登録されています', en: 'This feed already exists', zh: '此订阅源已存在'},
-  'modal.errorHttpsOnly': { ja: 'https:// で始まるURLのみ対応しています', en: 'Only https:// URLs are allowed', zh: '仅支持 https:// 开头的 URL'},
+  'modal.errorHttpOrHttpsOnly': { ja: 'http:// または https:// で始まるURLのみ対応しています', en: 'Only http:// or https:// URLs are allowed', zh: '仅支持以 http:// 或 https:// 开头的 URL'},
   'modal.genericError': { ja: 'エラーが発生しました', en: 'An error occurred', zh: '发生错误'},
   'modal.step.rssDiscovery': { ja: 'RSS 検出', en: 'RSS discovery', zh: 'RSS 发现'},
   'modal.step.flaresolverr': { ja: 'JSレンダリング', en: 'JS rendering', zh: 'JS 渲染'},
