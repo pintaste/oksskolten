@@ -124,15 +124,31 @@ function handleMark(body: Record<string, string | undefined>, response: Record<s
   }
 }
 
+async function readBodyArgs(request: FastifyRequest): Promise<Record<string, string | undefined>> {
+  // Some clients (e.g. Readrops) submit POST arguments as multipart/form-data
+  // instead of urlencoded; collect the field parts into a plain object.
+  if (request.isMultipart()) {
+    const fields: Record<string, string> = {}
+    for await (const part of request.parts()) {
+      if (part.type === 'field') fields[part.fieldname] = String(part.value)
+    }
+    return fields
+  }
+  return (typeof request.body === 'object' && request.body !== null
+    ? request.body
+    : {}) as Record<string, string | undefined>
+}
+
 async function feverHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const query = request.query as Record<string, string | undefined>
   if (!('api' in query)) {
     return reply.status(404).send({ error: 'Not found' })
   }
 
-  const body = (typeof request.body === 'object' && request.body !== null
-    ? request.body
-    : {}) as Record<string, string | undefined>
+  // Spec says write arguments are POSTed, but some clients put api_key (and
+  // mark arguments) in the query string. FreshRSS and Miniflux accept both,
+  // so merge with POST data taking precedence.
+  const body = { ...query, ...(await readBodyArgs(request)) }
 
   const response: Record<string, unknown> = { api_version: FEVER_API_VERSION, auth: 0 }
 
@@ -200,8 +216,12 @@ export async function feverRoutes(app: FastifyInstance): Promise<void> {
     done(null, parseQuerystring(payload as string))
   })
 
-  app.post('/api/fever', feverHandler)
-  app.get('/api/fever', feverHandler)
+  // Both with and without trailing slash: several clients append "/" to the
+  // configured endpoint URL.
+  for (const path of ['/api/fever', '/api/fever/']) {
+    app.post(path, feverHandler)
+    app.get(path, feverHandler)
+  }
 }
 
 const FeverConfigBody = z.object({

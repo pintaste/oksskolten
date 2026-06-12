@@ -82,6 +82,38 @@ describe('Fever API authentication', () => {
     expect(body.auth).toBe(1)
     expect(body).toHaveProperty('last_refreshed_on_time')
   })
+
+  it('accepts a trailing slash in the endpoint URL', async () => {
+    configureFever()
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/fever/?api`,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: `api_key=${API_KEY}`,
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().auth).toBe(1)
+  })
+
+  it('accepts the api_key as multipart/form-data', async () => {
+    configureFever()
+    const boundary = '----feverboundary'
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/fever?api',
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload: `--${boundary}\r\ncontent-disposition: form-data; name="api_key"\r\n\r\n${API_KEY}\r\n--${boundary}--\r\n`,
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().auth).toBe(1)
+  })
+
+  it('accepts the api_key in the query string', async () => {
+    configureFever()
+    const res = await app.inject({ method: 'GET', url: `/api/fever?api&api_key=${API_KEY}&unread_item_ids` })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().auth).toBe(1)
+  })
 })
 
 describe('Fever API reads', () => {
