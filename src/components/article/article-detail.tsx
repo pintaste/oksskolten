@@ -68,7 +68,6 @@ function isMediaParagraph(md: string): boolean {
 
 interface ArticleDetailProps {
   articleUrl: string
-  enableZapNavigation?: boolean
 }
 
 export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
