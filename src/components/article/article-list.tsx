@@ -13,6 +13,7 @@ import { useAppLayout } from '../../app'
 import { ArticleCard, type ArticleDisplayConfig } from './article-card'
 import { ArticleListToolbar } from './article-list-toolbar'
 import { SwipeableArticleCard } from './swipeable-article-card'
+import { articleUrlToPath } from '../../lib/url'
 import { ArticleOverlay } from './article-overlay'
 import { PullToRefresh } from '../layout/pull-to-refresh'
 import { useFetchProgressContext } from '../../contexts/fetch-progress-context'
@@ -176,10 +177,24 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   // ---------------------------------------------------------------------------
   // Keyboard navigation
   // ---------------------------------------------------------------------------
-  const { focusedItemId, setFocusedItemId } = useKeyboardNavigationContext()
+  const { focusedItemId, setFocusedItemId, setArticleIds, setArticleUrls, setLastListUrl } = useKeyboardNavigationContext()
   const isKeyboardNavEnabled = keyboardNavigation === 'on' && !isGridLayout
 
   const articleIds = useMemo(() => articles.map(a => String(a.id)), [articles])
+  const articleUrls = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const a of articles) map[String(a.id)] = a.url
+    return map
+  }, [articles])
+
+  useEffect(() => {
+    setArticleIds(articleIds)
+    setArticleUrls(articleUrls)
+  }, [articleIds, articleUrls, setArticleIds, setArticleUrls])
+
+  useEffect(() => {
+    setLastListUrl(location.pathname)
+  }, [location.pathname, setLastListUrl])
 
   const articleMap = useMemo(() => {
     const map = new Map<string, ArticleListItem>()
@@ -207,7 +222,9 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     onEnter: isOverlayMode ? undefined : (id) => {
       // Page mode: Enter to navigate
       const article = articleMap.get(id)
-      if (article) void navigate(`/${encodeURIComponent(article.url)}`)
+      if (article) {
+        void navigate(articleUrlToPath(article.url))
+      }
     },
     onEscape: () => {
       if (escapeDebounceRef.current) return
@@ -217,7 +234,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
       const article = articleMap.get(id)
       if (!article) return
       const next = !article.bookmarked_at
-      // Optimistic update: flip bookmarked_at in local SWR cache immediately
+      // Optimistic update on the list's SWR cache
       void mutate(
         (pages) => pages?.map(page => ({
           ...page,
@@ -229,6 +246,16 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
         })),
         { revalidate: false },
       )
+      // Also update the by-url cache so an open overlay (article-detail) reflects
+      // the change immediately. ArticleDetail keys its SWR off the article URL,
+      // which is a separate cache from the list and would otherwise stay stale.
+      const byUrlKey = `/api/articles/by-url?url=${encodeURIComponent(article.url)}`
+      void globalMutate(
+        byUrlKey,
+        (curr: { bookmarked_at: string | null } | undefined) =>
+          curr ? { ...curr, bookmarked_at: next ? new Date().toISOString() : null } : curr,
+        { revalidate: false },
+      )
       apiPatch(`/api/articles/${article.id}/bookmark`, { bookmarked: next })
         .then(() => {
           void globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds'))
@@ -236,6 +263,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
         .catch(() => {
           // Roll back on failure
           void mutate()
+          void globalMutate(byUrlKey)
         })
     },
     onOpenExternal: (id) => {
