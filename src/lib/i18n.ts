@@ -628,6 +628,17 @@ const dict = {
   'settings.tokenLastUsed': { ja: '最終使用:', en: 'Last used:', zh: '上次使用：'},
   'settings.noTokens': { ja: 'APIトークンはまだありません', en: 'No API tokens yet', zh: '暂无 API 令牌'},
 
+  // Settings — Fever API
+  'settings.fever': { ja: 'Fever API', en: 'Fever API', zh: 'Fever API'},
+  'settings.feverDesc': { ja: 'Reeder や ReadKit などの RSS クライアントから記事を同期するための Fever 互換 API を提供します', en: 'Expose a Fever-compatible API so RSS clients like Reeder and ReadKit can sync articles', zh: '提供 Fever 兼容 API，让 Reeder、ReadKit 等 RSS 客户端同步文章'},
+  'settings.feverUsername': { ja: 'ユーザー名', en: 'Username', zh: '用户名'},
+  'settings.feverPassword': { ja: 'パスワード', en: 'Password', zh: '密码'},
+  'settings.feverSave': { ja: '保存', en: 'Save', zh: '保存'},
+  'settings.feverSaved': { ja: 'Fever API の認証情報を保存しました', en: 'Fever API credentials saved', zh: 'Fever API 凭据已保存'},
+  'settings.feverEndpoint': { ja: 'エンドポイント URL', en: 'Endpoint URL', zh: '端点 URL'},
+  'settings.feverEndpointHint': { ja: 'クライアントの Fever アカウント設定にこの URL と上記のユーザー名・パスワードを入力してください', en: 'Enter this URL with the username and password above in your client\'s Fever account settings', zh: '在客户端的 Fever 账户设置中填入此 URL 以及上面的用户名和密码'},
+  'settings.feverNotConfigured': { ja: '有効にするにはユーザー名とパスワードを設定してください', en: 'Set a username and password to enable the Fever API', zh: '请先设置用户名和密码以启用 Fever API'},
+
   // Settings — email change
   'settings.changeEmail': { ja: 'メールアドレス変更', en: 'Change Email', zh: '更改邮箱'},
   'settings.currentEmail': { ja: '現在のメールアドレス', en: 'Current email', zh: '当前邮箱'},
