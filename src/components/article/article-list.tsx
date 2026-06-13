@@ -568,6 +568,13 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     setSelectionActive(false)
   }, [])
 
+  useEffect(() => {
+    if (!isSelectionMode) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleCancelSelection() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isSelectionMode, handleCancelSelection])
+
   const handleBatchMarkRead = useCallback(async () => {
     const ids = [...selectedIds]
     setSelectedIds(new Set()); setSelectionActive(false)

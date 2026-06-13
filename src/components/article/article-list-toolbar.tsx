@@ -59,25 +59,26 @@ export function ArticleListToolbar({
           <span className="text-xs font-semibold text-text">
             {t('articles.selectedCount', { n: String(selectedCount) })}
           </span>
-          <button
-            type="button"
-            onClick={onCancelSelection}
-            className="text-xs text-muted hover:text-text transition-colors"
-          >
-            {t('articles.cancelSelection')}
-          </button>
+        </div>
+
+        <div className="flex items-center gap-1">
           {selectedCount < totalCount && (
             <button
               type="button"
               onClick={onSelectAll}
-              className="text-xs text-muted hover:text-text transition-colors"
+              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded text-muted hover:text-text hover:bg-hover transition-colors"
             >
               {t('articles.selectAll')}
             </button>
           )}
-        </div>
-
-        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onCancelSelection}
+            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded text-muted hover:text-text hover:bg-hover transition-colors"
+          >
+            {t('articles.cancelSelection')}
+          </button>
+          <span className="text-border">|</span>
           {onBatchAction && batchActionLabel ? (
             <button
               type="button"
