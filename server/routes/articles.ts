@@ -629,24 +629,23 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
       }
       const ids = body.ids as number[]
       const targetLang = getTranslateTargetLang()
-      const results: { id: number; title_translated: string }[] = []
 
-      for (const id of ids) {
-        const article = getArticleById(id)
-        if (!article) continue
-        if (article.lang === targetLang) continue
-        if (article.title_translated) {
-          results.push({ id, title_translated: article.title_translated })
-          continue
-        }
-        try {
+      const settled = await Promise.allSettled(
+        ids.map(async (id): Promise<{ id: number; title_translated: string } | null> => {
+          const article = getArticleById(id)
+          if (!article || article.lang === targetLang) return null
+          if (article.title_translated) return { id, title_translated: article.title_translated }
           const translated = await translateTitle(article.title)
           updateArticleContent(id, { title_translated: translated })
-          results.push({ id, title_translated: translated })
-        } catch {
-          // skip failed titles silently
-        }
-      }
+          return { id, title_translated: translated }
+        }),
+      )
+
+      const results = settled
+        .filter((r): r is PromiseFulfilledResult<{ id: number; title_translated: string }> =>
+          r.status === 'fulfilled' && r.value !== null,
+        )
+        .map(r => r.value)
 
       reply.send({ results })
     },
