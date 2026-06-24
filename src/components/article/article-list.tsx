@@ -125,7 +125,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const bookmarkedOnly = isBookmarks
   const likedOnly = isLikes
   const readOnly = isHistory || readFilter === 'read'
-  const { autoMarkRead, dateMode, indicatorStyle, layout, articleOpenMode, keyboardNavigation, keybindings, translateTitleAuto, translateTargetLang, translateProvider } = settings
+  const { autoMarkRead, dateMode, indicatorStyle, layout, articleOpenMode, keyboardNavigation, keybindings, translateTitleAuto, translateTargetLang } = settings
   const [overlayUrl, setOverlayUrl] = useState<string | null>(null)
   const [noFloor, setNoFloor] = useState(false)
   const [titleTranslations, setTitleTranslations] = useState<Map<number, string>>(new Map())
@@ -205,7 +205,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
 
   // Auto-translate titles when setting is on
   useEffect(() => {
-    if (translateTitleAuto !== 'on' || !translateProvider || articles.length === 0) return
+    if (translateTitleAuto !== 'on' || articles.length === 0) return
     const targetLang = translateTargetLang || undefined
     const needsTranslation = articles.filter(a =>
       !a.title_translated &&
@@ -225,7 +225,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
         })
       })
       .catch(() => {})
-  }, [articles, translateTitleAuto, translateProvider, translateTargetLang, titleTranslations])
+  }, [articles, translateTitleAuto, translateTargetLang, titleTranslations])
 
   const isOverlayMode = articleOpenMode === 'overlay'
   // Short debounce after overlay close to prevent Escape from immediately clearing focus
