@@ -125,9 +125,10 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const bookmarkedOnly = isBookmarks
   const likedOnly = isLikes
   const readOnly = isHistory || readFilter === 'read'
-  const { autoMarkRead, dateMode, indicatorStyle, layout, articleOpenMode, keyboardNavigation, keybindings } = settings
+  const { autoMarkRead, dateMode, indicatorStyle, layout, articleOpenMode, keyboardNavigation, keybindings, translateTitleAuto, translateTargetLang, translateProvider } = settings
   const [overlayUrl, setOverlayUrl] = useState<string | null>(null)
   const [noFloor, setNoFloor] = useState(false)
+  const [titleTranslations, setTitleTranslations] = useState<Map<number, string>>(new Map())
   const displayConfig: ArticleDisplayConfig = useMemo(() => ({
     dateMode,
     indicatorStyle,
@@ -201,6 +202,30 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     for (const a of articles) map.set(String(a.id), a)
     return map
   }, [articles])
+
+  // Auto-translate titles when setting is on
+  useEffect(() => {
+    if (translateTitleAuto !== 'on' || !translateProvider || articles.length === 0) return
+    const targetLang = translateTargetLang || undefined
+    const needsTranslation = articles.filter(a =>
+      !a.title_translated &&
+      !titleTranslations.has(a.id) &&
+      (!targetLang || a.lang !== targetLang),
+    )
+    if (needsTranslation.length === 0) return
+    const ids = needsTranslation.map(a => a.id)
+    apiPost('/api/articles/translate-titles', { ids })
+      .then((res: unknown) => {
+        const data = res as { results: { id: number; title_translated: string }[] }
+        if (!data.results?.length) return
+        setTitleTranslations(prev => {
+          const next = new Map(prev)
+          for (const { id, title_translated } of data.results) next.set(id, title_translated)
+          return next
+        })
+      })
+      .catch(() => {})
+  }, [articles, translateTitleAuto, translateProvider, translateTargetLang, titleTranslations])
 
   const isOverlayMode = articleOpenMode === 'overlay'
   // Short debounce after overlay close to prevent Escape from immediately clearing focus
@@ -872,6 +897,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             isSelectionMode,
             isSelected: selectedIds.has(article.id),
             onSelect: handleSelect,
+            titleTranslated: titleTranslations.get(article.id) ?? effectiveArticle.title_translated ?? undefined,
             ...displayConfig,
           }
           const isKbFocused = focusedItemId === String(article.id)

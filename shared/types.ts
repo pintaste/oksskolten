@@ -68,6 +68,7 @@ export interface ArticleListItem {
   url: string
   published_at: string | null
   lang: string | null
+  title_translated: string | null
   summary: string | null
   excerpt: string | null
   og_image: string | null

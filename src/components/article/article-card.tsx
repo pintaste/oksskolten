@@ -40,6 +40,7 @@ interface ArticleCardProps extends ArticleDisplayConfig {
   isSelectionMode?: boolean
   isSelected?: boolean
   onSelect?: (article: ArticleListItem) => void
+  titleTranslated?: string
 }
 
 function Thumbnail({ src, className }: { src: string | null; articleUrl: string; className?: string }) {
@@ -171,7 +172,7 @@ function useCardBase(article: ArticleListItem, dateMode: 'relative' | 'absolute'
 }
 
 /** List layout — classic single-column (current default) */
-function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onClick, onToggleBookmark, onToggleRead, onOpenExternal, isSelectionMode, isSelected, onSelect }: ArticleCardProps) {
+function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onClick, onToggleBookmark, onToggleRead, onOpenExternal, isSelectionMode, isSelected, onSelect, titleTranslated }: ArticleCardProps) {
   const { t } = useI18n()
   const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
   const showIndicator = isUnread && showUnreadIndicator
@@ -205,8 +206,11 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onCl
               isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
             }`}
           >
-            {article.title}
+            {titleTranslated ?? article.title}
           </span>
+          {titleTranslated && (
+            <span className="text-[12px] text-muted truncate block">{article.title}</span>
+          )}
           {article.excerpt && (
             <p className="text-[13px] text-muted truncate mt-0.5">
               {stripMarkup(article.excerpt)}
@@ -242,7 +246,7 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onCl
 }
 
 /** Card layout — image-forward grid card */
-function GridCard({ article, dateMode, showThumbnails, onClick }: ArticleCardProps) {
+function GridCard({ article, dateMode, showThumbnails, onClick, titleTranslated }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
 
   return (
@@ -259,8 +263,11 @@ function GridCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPro
             isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
           }`}
         >
-          {article.title}
+          {titleTranslated ?? article.title}
         </span>
+        {titleTranslated && (
+          <span className="text-[11px] text-muted line-clamp-1 block">{article.title}</span>
+        )}
         {article.excerpt && (
           <p className="text-[12px] text-muted line-clamp-2 mt-1">
             {article.excerpt}
@@ -288,7 +295,7 @@ function GridCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPro
 }
 
 /** Magazine layout — hero card (large) */
-function HeroCard({ article, dateMode, showThumbnails, onClick }: ArticleCardProps) {
+function HeroCard({ article, dateMode, showThumbnails, onClick, titleTranslated }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
 
   return (
@@ -305,8 +312,11 @@ function HeroCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPro
             isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
           }`}
         >
-          {article.title}
+          {titleTranslated ?? article.title}
         </span>
+        {titleTranslated && (
+          <span className="text-[12px] text-muted line-clamp-1 block">{article.title}</span>
+        )}
         {article.excerpt && (
           <p className="text-[14px] text-muted line-clamp-3 mt-1.5">
             {article.excerpt}
@@ -334,7 +344,7 @@ function HeroCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPro
 }
 
 /** Magazine layout — small card (below hero) */
-function SmallCard({ article, dateMode, showThumbnails, onClick }: ArticleCardProps) {
+function SmallCard({ article, dateMode, showThumbnails, onClick, titleTranslated }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
 
   return (
@@ -351,8 +361,11 @@ function SmallCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPr
             isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
           }`}
         >
-          {article.title}
+          {titleTranslated ?? article.title}
         </span>
+        {titleTranslated && (
+          <span className="text-[11px] text-muted truncate block">{article.title}</span>
+        )}
         {article.excerpt && (
           <p className="text-[12px] text-muted truncate mt-0.5">
             {article.excerpt}
@@ -380,7 +393,7 @@ function SmallCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPr
 }
 
 /** Compact layout — title and date only */
-function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onClick, onToggleBookmark, onToggleRead, onOpenExternal, isSelectionMode, isSelected, onSelect }: ArticleCardProps) {
+function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onClick, onToggleBookmark, onToggleRead, onOpenExternal, isSelectionMode, isSelected, onSelect, titleTranslated }: ArticleCardProps) {
   const { isUnread, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
   const showIndicator = isUnread && showUnreadIndicator
 
@@ -407,12 +420,17 @@ function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, o
             {isSelected && <Check size={9} className="text-accent-text" strokeWidth={3} />}
           </button>
         )}
-        <span
-          className={`text-[14px] truncate flex-1 transition-colors duration-500 ${
-            isUnread ? 'font-medium text-text' : 'font-normal text-muted'
-          }`}
-        >
-          {article.title}
+        <span className="flex-1 min-w-0 flex flex-col">
+          <span
+            className={`text-[14px] truncate transition-colors duration-500 ${
+              isUnread ? 'font-medium text-text' : 'font-normal text-muted'
+            }`}
+          >
+            {titleTranslated ?? article.title}
+          </span>
+          {titleTranslated && (
+            <span className="text-[11px] text-muted truncate">{article.title}</span>
+          )}
         </span>
         <span className="text-[11px] text-muted shrink-0 ml-2">{dateText}</span>
         <CardActions article={article} isUnread={isUnread} onToggleBookmark={onToggleBookmark} onToggleRead={onToggleRead} onOpenExternal={onOpenExternal} />

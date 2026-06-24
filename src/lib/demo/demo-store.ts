@@ -186,6 +186,7 @@ function toArticleListItem(a: SeedArticle): ArticleListItem {
     url: a.url,
     published_at: a.published_at,
     lang: a.lang,
+    title_translated: null,
     summary: summarizedIds.has(a.id) ? articleSummary(a) : null,
     excerpt: a.excerpt,
     og_image: a.og_image,

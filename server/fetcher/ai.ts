@@ -125,6 +125,25 @@ export async function streamSummarizeArticle(
   return { summary: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model }
 }
 
+export async function translateTitle(title: string): Promise<string> {
+  const provider = getSetting('translate.provider') || TASK_DEFAULTS.translate.provider
+  const targetLang = getTargetLang()
+  const sourceLang = getSetting('translate.source_lang') || null
+  if (provider === 'google-translate') {
+    const result = await googleTranslate(title, targetLang, sourceLang)
+    return result.translatedText
+  }
+  if (provider === 'deepl') {
+    const result = await deeplTranslate(title, targetLang, sourceLang)
+    return result.translatedText
+  }
+  const source = sourceLang && sourceLang !== targetLang ? ` from ${languageName(sourceLang)}` : ''
+  const prompt = `Translate the following article title${source} into ${languageName(targetLang)}. Output only the translated title, nothing else.\n\n${title}`
+  const config: AiTaskConfig = { ...translateConfig, buildPrompt: () => prompt }
+  const r = await runAiTask(config, title)
+  return r.text.trim()
+}
+
 export async function translateArticle(fullText: string): Promise<{ fullTextTranslated: string } & AiTextResult> {
   const provider = getSetting('translate.provider') || TASK_DEFAULTS.translate.provider
   if (provider === 'google-translate') {

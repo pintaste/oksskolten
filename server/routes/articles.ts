@@ -42,7 +42,7 @@ import type { MeiliArticleDoc } from '../search/client.js'
 import { buildMeiliFilter, meiliSearch } from '../search/client.js'
 import { isSearchReady, syncArticleToSearch } from '../search/sync.js'
 import { requireJson } from '../auth.js'
-import { summarizeArticle, translateArticle, streamSummarizeArticle, streamTranslateArticle, fetchArticleContent } from '../fetcher.js'
+import { summarizeArticle, translateArticle, streamSummarizeArticle, streamTranslateArticle, fetchArticleContent, translateTitle } from '../fetcher.js'
 import type { AiTextResult } from '../fetcher.js'
 import { archiveArticleImages, isImageArchivingEnabled, deleteArticleImages } from '../fetcher/article-images.js'
 import { getSetting } from '../db/settings.js'
@@ -614,6 +614,42 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
       errorMessage: 'Translation failed',
       errorCode: 'TRANSLATION_FAILED',
     }),
+  )
+
+  // --- Batch title translation ---
+
+  api.post(
+    '/api/articles/translate-titles',
+    { preHandler: [requireJson] },
+    async (request, reply) => {
+      const body = request.body as { ids?: unknown }
+      if (!Array.isArray(body?.ids) || body.ids.some(id => typeof id !== 'number')) {
+        reply.status(400).send({ error: 'ids must be an array of numbers' })
+        return
+      }
+      const ids = body.ids as number[]
+      const targetLang = getTranslateTargetLang()
+      const results: { id: number; title_translated: string }[] = []
+
+      for (const id of ids) {
+        const article = getArticleById(id)
+        if (!article) continue
+        if (article.lang === targetLang) continue
+        if (article.title_translated) {
+          results.push({ id, title_translated: article.title_translated })
+          continue
+        }
+        try {
+          const translated = await translateTitle(article.title)
+          updateArticleContent(id, { title_translated: translated })
+          results.push({ id, title_translated: translated })
+        } catch {
+          // skip failed titles silently
+        }
+      }
+
+      reply.send({ results })
+    },
   )
 
   // --- Image archiving ---

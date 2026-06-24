@@ -192,7 +192,7 @@ export function getArticles(opts: {
 
   const articles = allNamed<ArticleListItem>(`
     SELECT a.id, a.feed_id, f.name AS feed_name,
-           a.title, a.url, a.published_at, a.lang, a.summary, a.excerpt, a.og_image, a.seen_at, a.read_at, a.bookmarked_at, a.liked_at,
+           a.title, a.url, a.published_at, a.lang, a.title_translated, a.summary, a.excerpt, a.og_image, a.seen_at, a.read_at, a.bookmarked_at, a.liked_at,
            a.score,
            (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count,
            CASE WHEN a.full_text IS NOT NULL AND LENGTH(a.full_text) > 200
@@ -464,6 +464,7 @@ export function updateArticleContent(
     full_text?: string | null
     full_text_translated?: string | null
     translated_lang?: string | null
+    title_translated?: string | null
     summary?: string | null
     excerpt?: string | null
     og_image?: string | null
