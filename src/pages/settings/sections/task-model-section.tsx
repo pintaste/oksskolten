@@ -38,6 +38,8 @@ interface TaskConfig {
   autoLabelKey?: MessageKey
   autoOnKey?: MessageKey
   autoOffKey?: MessageKey
+  titleAutoValue?: 'on' | 'off'
+  setTitleAuto?: (v: 'on' | 'off') => void
   targetLangValue?: string | null
   setTargetLang?: (v: string) => void
 }
@@ -145,6 +147,8 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
       setSummaryAuto,
       translateAuto,
       setTranslateAuto,
+      translateTitleAuto,
+      setTranslateTitleAuto,
     } = settings
 
   useEffect(() => {
@@ -205,6 +209,8 @@ export function TaskModelSection({ settings, t, hiddenProviders }: { settings: S
       autoLabelKey: 'translate.auto',
       autoOnKey: 'translate.autoOn',
       autoOffKey: 'translate.autoOff',
+      titleAutoValue: translateTitleAuto === 'on' ? 'on' : 'off',
+      setTitleAuto: setTranslateTitleAuto,
       targetLangValue: settings.translateTargetLang,
       setTargetLang: settings.setTranslateTargetLang,
     },
@@ -367,6 +373,7 @@ function TaskModelRow({
   const hasTranslateServices = !!task.hasTranslateServices
   const currentIsTranslateService = isTranslateService(task.providerValue)
   const hasAuto = task.setAuto !== undefined
+  const hasTitleAuto = task.setTitleAuto !== undefined
   const hasTargetLang = task.setTargetLang !== undefined
   const autoLabelKey: MessageKey = task.autoLabelKey ?? 'summary.auto'
   const autoOnKey: MessageKey = task.autoOnKey ?? 'summary.autoOn'
@@ -434,6 +441,24 @@ function TaskModelRow({
               optionClassName="flex items-center gap-2.5 cursor-pointer py-1"
               value={autoSetting}
               onChange={task.setAuto ?? (() => {})}
+            />
+          </div>
+        )}
+        {hasTitleAuto && (
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-muted">
+              {t('translate.titleAuto')}
+            </div>
+            <RadioGroup
+              name={`${task.labelKey}-title-auto`}
+              options={[
+                { value: 'on', label: t('translate.titleAutoOn') },
+                { value: 'off', label: t('translate.titleAutoOff') },
+              ]}
+              className="flex items-center gap-3"
+              optionClassName="flex items-center gap-2.5 cursor-pointer py-1"
+              value={task.titleAutoValue ?? 'off'}
+              onChange={task.setTitleAuto ?? (() => {})}
             />
           </div>
         )}

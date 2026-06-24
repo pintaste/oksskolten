@@ -48,6 +48,7 @@ interface Prefs {
   'summary.auto': string | null
   'summary.target_lang': string | null
   'translate.auto': string | null
+  'translate.title_auto': string | null
   'translate.provider': string | null
   'translate.model': string | null
   'translate.target_lang': string | null
@@ -88,6 +89,7 @@ export function useSettings() {
   const [summaryAuto, setSummaryAutoState] = useState<'on' | 'off' | null>(null)
   const [summaryTargetLang, setSummaryTargetLangState] = useState<string | null>(null)
   const [translateAuto, setTranslateAutoState] = useState<'on' | 'off' | null>(null)
+  const [translateTitleAuto, setTranslateTitleAutoState] = useState<'on' | 'off' | null>(null)
   const [translateProvider, setTranslateProviderState] = useState<string | null>(null)
   const [translateModel, setTranslateModelState] = useState<string | null>(null)
   const [translateTargetLang, setTranslateTargetLangState] = useState<string | null>(null)
@@ -125,6 +127,8 @@ export function useSettings() {
   summaryAutoRef.current = summaryAuto || 'off'
   const translateAutoRef = useRef('off')
   translateAutoRef.current = translateAuto || 'off'
+  const translateTitleAutoRef = useRef('off')
+  translateTitleAutoRef.current = translateTitleAuto || 'off'
   const chatPositionRef = useRef(chatPosition)
   chatPositionRef.current = chatPosition
   const articleOpenModeRef = useRef(articleOpenMode)
@@ -187,6 +191,7 @@ export function useSettings() {
       { key: 'summary.auto', setter: setSummaryAutoState, backfillRef: summaryAutoRef, validate: v => v === 'on' || v === 'off' },
       { key: 'summary.target_lang', setter: setSummaryTargetLangState },
       { key: 'translate.auto', setter: setTranslateAutoState, backfillRef: translateAutoRef, validate: v => v === 'on' || v === 'off' },
+      { key: 'translate.title_auto', setter: setTranslateTitleAutoState, backfillRef: translateTitleAutoRef, validate: v => v === 'on' || v === 'off' },
       { key: 'translate.provider', setter: setTranslateProviderState },
       { key: 'translate.model', setter: setTranslateModelState },
       { key: 'translate.target_lang', setter: setTranslateTargetLangState },
@@ -332,6 +337,7 @@ export function useSettings() {
       syncedSetSummaryAuto,
       syncedSetSummaryTargetLang,
       syncedSetTranslateAuto,
+      syncedSetTranslateTitleAuto,
       syncedSetTranslateProvider,
       syncedSetTranslateModel,
       syncedSetTranslateTargetLang,
@@ -371,6 +377,7 @@ export function useSettings() {
       syncedSetSummaryAuto: make<'on' | 'off'>('summary.auto', setSummaryAutoState),
       syncedSetSummaryTargetLang: make<string>('summary.target_lang', setSummaryTargetLangState),
       syncedSetTranslateAuto: make<'on' | 'off'>('translate.auto', setTranslateAutoState),
+      syncedSetTranslateTitleAuto: make<'on' | 'off'>('translate.title_auto', setTranslateTitleAutoState),
       syncedSetTranslateProvider: make<string>('translate.provider', setTranslateProviderState),
       syncedSetTranslateModel: make<string>('translate.model', setTranslateModelState),
       syncedSetTranslateTargetLang: make<string>('translate.target_lang', setTranslateTargetLangState),
@@ -463,6 +470,8 @@ export function useSettings() {
     setSummaryTargetLang: syncedSetSummaryTargetLang,
     translateAuto,
     setTranslateAuto: syncedSetTranslateAuto,
+    translateTitleAuto,
+    setTranslateTitleAuto: syncedSetTranslateTitleAuto,
     translateProvider,
     setTranslateProvider: syncedSetTranslateProvider,
     translateModel,
