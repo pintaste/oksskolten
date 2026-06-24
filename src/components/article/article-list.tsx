@@ -897,7 +897,9 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             isSelectionMode,
             isSelected: selectedIds.has(article.id),
             onSelect: handleSelect,
-            titleTranslated: titleTranslations.get(article.id) ?? effectiveArticle.title_translated ?? undefined,
+            titleTranslated: translateTitleAuto === 'on'
+              ? (titleTranslations.get(article.id) ?? effectiveArticle.title_translated ?? undefined)
+              : undefined,
             ...displayConfig,
           }
           const isKbFocused = focusedItemId === String(article.id)
