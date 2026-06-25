@@ -5,14 +5,14 @@ After=network.target docker.service
 [Service]
 Type=simple
 # Change User to whoever owns the repo and can run docker
-User=YOUR_USER
-WorkingDirectory=/path/to/oksskolten
+User=ubuntu
+WorkingDirectory=/home/ubuntu/oksskolten
 
 Environment=WEBHOOK_PORT=9000
 Environment=DEPLOY_BRANCH=main
 Environment=WEBHOOK_SECRET_FILE=/etc/oksskolten/webhook-secret
 
-ExecStart=/usr/bin/python3 /path/to/oksskolten/scripts/webhook.py
+ExecStart=/usr/bin/python3 /home/ubuntu/oksskolten/scripts/webhook.py
 Restart=on-failure
 RestartSec=5
 

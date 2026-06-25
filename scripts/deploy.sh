@@ -16,7 +16,10 @@ export GIT_COMMIT="$(git rev-parse --short HEAD)"
 export GIT_TAG="$(git describe --tags --exact-match 2>/dev/null || echo unknown)"
 export BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-log "Rebuilding and restarting containers (commit ${GIT_COMMIT})..."
-make prod
+log "Building new image... (commit ${GIT_COMMIT})"
+docker compose -f compose.yaml -f compose.prod.yaml build --no-cache server
+
+log "Restarting server..."
+docker compose -f compose.yaml -f compose.prod.yaml up -d --no-deps server
 
 log "=== Deploy finished ==="

@@ -11,10 +11,9 @@ services:
       NODE_ENV: production
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
     volumes: !override
-      - ${DATA_DIR:-./data}:/data
-    ports: !override []
-    expose:
-      - "3000"
+      - ./data:/data
+    ports: !override
+      - "9600:3000"
 
   meilisearch:
     environment:
@@ -40,3 +39,5 @@ services:
     networks:
       - internal
     restart: unless-stopped
+    deploy:
+      replicas: 0
