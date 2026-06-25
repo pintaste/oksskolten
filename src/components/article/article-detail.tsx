@@ -71,7 +71,7 @@ interface ArticleDetailProps {
 }
 
 export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
-  const { settings: { internalLinks, chatPosition, translateProvider, translateModel, translateTargetLang, translateSourceLang, summaryAuto, translateAuto, colorMode, setColorMode } } = useAppLayout()
+  const { settings: { internalLinks, chatPosition, translateProvider, translateModel, translateTargetLang, translateSourceLang, summaryAuto, translateAuto, translateTitleAuto, colorMode, setColorMode } } = useAppLayout()
   const navigate = useNavigate()
   const { t, tError, isKeyNotSetError, locale } = useI18n()
   const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
@@ -283,7 +283,7 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
       <article ref={articleRef} className="article-card max-w-2xl mx-auto px-6 md:px-10 py-8">
       {/* Title */}
       <h1 className="mb-1.5 text-[28px] font-bold leading-[1.3] break-words [overflow-wrap:anywhere]">
-        {article.title}
+        {(translateTitleAuto === 'on' && article.title_translated) ? article.title_translated : article.title}
       </h1>
 
       {/* Date */}

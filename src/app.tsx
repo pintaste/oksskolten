@@ -138,6 +138,7 @@ function ArticleListPage() {
   const { feedId, categoryId } = useParams<{ feedId?: string; categoryId?: string }>()
   const location = useLocation()
   const { t } = useI18n()
+  const { settings } = useAppLayout()
   const isInbox = location.pathname === '/inbox'
   const isBookmarks = location.pathname === '/bookmarks'
   const isLikes = location.pathname === '/likes'
@@ -165,16 +166,98 @@ function ArticleListPage() {
   const articleListRef = useRef<ArticleListHandle>(null)
   const revalidateArticles = useCallback(() => articleListRef.current?.revalidate(), [])
 
-  return (
-    <PageLayout
-      feedName={headerName}
-      feedListProps={{ onMarkAllRead: revalidateArticles, onArticleMoved: revalidateArticles }}
-    >
+  // Split mode state
+  const [splitUrl, setSplitUrl] = useState<string | null>(null)
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= MD_BREAKPOINT)
+  const [splitPanelWidth, setSplitPanelWidth] = useState(() => {
+    const n = Number(localStorage.getItem('split-panel-width'))
+    return n >= 200 && n <= 640 ? n : 360
+  })
+
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = splitPanelWidth
+    const clamp = (w: number) => Math.min(640, Math.max(200, w))
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+    const onMove = (ev: MouseEvent) => setSplitPanelWidth(clamp(startWidth + ev.clientX - startX))
+    const onUp = (ev: MouseEvent) => {
+      const final = clamp(startWidth + ev.clientX - startX)
+      setSplitPanelWidth(final)
+      localStorage.setItem('split-panel-width', String(final))
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [splitPanelWidth])
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`)
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  // Reset selected article when navigating to a different feed/section
+  useEffect(() => { setSplitUrl(null) }, [location.pathname])
+
+  const isSplitMode = settings.articleOpenMode === 'split' && isDesktop
+
+  const hints = (
+    <>
       {isInbox && <HintBanner storageKey="hint-dismissed-inbox">{t('hint.inbox')}</HintBanner>}
       {isBookmarks && <HintBanner storageKey="hint-dismissed-bookmarks">{t('hint.bookmarks')}</HintBanner>}
       {isLikes && <HintBanner storageKey="hint-dismissed-likes">{t('hint.likes')}</HintBanner>}
       {isHistory && <HintBanner storageKey="hint-dismissed-history">{t('hint.history')}</HintBanner>}
       {isClips && <HintBanner storageKey="hint-dismissed-clips">{t('hint.clips')}</HintBanner>}
+    </>
+  )
+
+  if (isSplitMode) {
+    return (
+      <PageLayout
+        feedName={headerName}
+        feedListProps={{ onMarkAllRead: revalidateArticles, onArticleMoved: revalidateArticles }}
+      >
+        {hints}
+        <div className="flex" style={{ height: 'calc(100vh - 48px)' }}>
+          {/* Article list panel */}
+          <div className="shrink-0 overflow-y-auto" style={{ width: splitPanelWidth }}>
+            <ArticleList
+              ref={articleListRef}
+              onSplitOpen={setSplitUrl}
+              selectedUrl={splitUrl}
+            />
+          </div>
+          {/* Resize handle */}
+          <div
+            className="w-1 shrink-0 cursor-col-resize border-r border-border hover:bg-accent/20 transition-colors"
+            onMouseDown={handleResizeMouseDown}
+          />
+          {/* Article detail panel */}
+          <div className="flex-1 overflow-y-auto">
+            {splitUrl ? (
+              <ArticleDetail articleUrl={splitUrl} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted text-sm select-none">
+                {t('settings.splitViewEmpty')}
+              </div>
+            )}
+          </div>
+        </div>
+      </PageLayout>
+    )
+  }
+
+  return (
+    <PageLayout
+      feedName={headerName}
+      feedListProps={{ onMarkAllRead: revalidateArticles, onArticleMoved: revalidateArticles }}
+    >
+      {hints}
       <ArticleList ref={articleListRef} />
     </PageLayout>
   )

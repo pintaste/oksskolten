@@ -101,7 +101,12 @@ export interface ArticleListHandle {
   revalidate: () => void
 }
 
-export const ArticleList = forwardRef<ArticleListHandle, object>(function ArticleList(_props, ref) {
+interface ArticleListProps {
+  onSplitOpen?: (url: string) => void
+  selectedUrl?: string | null
+}
+
+export const ArticleList = forwardRef<ArticleListHandle, ArticleListProps>(function ArticleList({ onSplitOpen, selectedUrl }, ref) {
   const location = useLocation()
   const navigate = useNavigate()
   const { feedId: feedIdParam, categoryId: categoryIdParam } = useParams<{ feedId?: string; categoryId?: string }>()
@@ -228,6 +233,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   }, [articles, translateTitleAuto, translateTargetLang, titleTranslations])
 
   const isOverlayMode = articleOpenMode === 'overlay'
+  const isSplitMode = articleOpenMode === 'split'
   // Short debounce after overlay close to prevent Escape from immediately clearing focus
   const escapeDebounceRef = useRef(false)
 
@@ -243,8 +249,13 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
         const article = articleMap.get(id)
         if (article) setOverlayUrl(article.url)
       }
+      // Split mode: open article in right panel on j/k
+      if (isSplitMode && onSplitOpen) {
+        const article = articleMap.get(id)
+        if (article) onSplitOpen(article.url)
+      }
     },
-    onEnter: isOverlayMode ? undefined : (id) => {
+    onEnter: (isOverlayMode || isSplitMode) ? undefined : (id) => {
       // Page mode: Enter to navigate
       const article = articleMap.get(id)
       if (article) {
@@ -749,7 +760,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const showToolbar = !isCollectionView || isBookmarks || isLikes || isHistory || isClips
 
   return (
-    <main ref={listRef} className="max-w-2xl mx-auto" role={!isGridLayout ? 'listbox' : undefined}>
+    <main ref={listRef} className={isSplitMode ? '' : 'max-w-2xl mx-auto'} role={!isGridLayout ? 'listbox' : undefined}>
       {isTouchDevice && <PullToRefresh onRefresh={async () => {
         if (feedId) {
           const result = await startFeedFetch(feedId)
@@ -884,6 +895,9 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             if (articleOpenMode === 'overlay') {
               e.preventDefault()
               setOverlayUrl(article.url)
+            } else if (articleOpenMode === 'split' && onSplitOpen) {
+              e.preventDefault()
+              onSplitOpen(article.url)
             }
           }
           const cardProps = {
@@ -903,14 +917,15 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             ...displayConfig,
           }
           const isKbFocused = focusedItemId === String(article.id)
+          const isSplitSelected = isSplitMode && selectedUrl === article.url
           return (
             <div
               key={article.id}
               data-article-id={article.id}
               data-article-unread={article.seen_at == null && !isAutoRead ? '1' : '0'}
-              aria-selected={isKbFocused || undefined}
+              aria-selected={isKbFocused || isSplitSelected || undefined}
               className={layout === 'magazine' && index === 0 ? 'col-span-full' : ''}
-              style={isKbFocused ? {
+              style={(isKbFocused || isSplitSelected) ? {
                 borderLeft: '2px solid var(--color-accent)',
                 backgroundColor: 'color-mix(in srgb, var(--color-accent) 10%, transparent)',
               } : undefined}
