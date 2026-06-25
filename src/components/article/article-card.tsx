@@ -1,6 +1,6 @@
 import { useState, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bookmark, ExternalLink, Circle, CheckCircle, Check } from 'lucide-react'
+import { Bookmark, ExternalLink, Circle, CheckCircle, Check, Languages } from 'lucide-react'
 import { useI18n } from '../../lib/i18n'
 import { isReadInSession } from '../../lib/readTracker'
 import { extractDomain, articleUrlToPath } from '../../lib/url'
@@ -206,7 +206,7 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onCl
               isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
             }`}
           >
-            {titleTranslated ?? article.title}
+            {titleTranslated ? <><Languages size={12} className="inline-block align-[-1px] mr-0.5 opacity-50 shrink-0" />{titleTranslated}</> : article.title}
           </span>
           {titleTranslated && (
             <span className="text-[12px] text-muted truncate block">{article.title}</span>
@@ -263,7 +263,7 @@ function GridCard({ article, dateMode, showThumbnails, onClick, titleTranslated 
             isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
           }`}
         >
-          {titleTranslated ?? article.title}
+          {titleTranslated ? <><Languages size={12} className="inline-block align-[-1px] mr-0.5 opacity-50 shrink-0" />{titleTranslated}</> : article.title}
         </span>
         {titleTranslated && (
           <span className="text-[11px] text-muted line-clamp-1 block">{article.title}</span>
@@ -312,7 +312,7 @@ function HeroCard({ article, dateMode, showThumbnails, onClick, titleTranslated 
             isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
           }`}
         >
-          {titleTranslated ?? article.title}
+          {titleTranslated ? <><Languages size={12} className="inline-block align-[-1px] mr-0.5 opacity-50 shrink-0" />{titleTranslated}</> : article.title}
         </span>
         {titleTranslated && (
           <span className="text-[12px] text-muted line-clamp-1 block">{article.title}</span>
@@ -361,7 +361,7 @@ function SmallCard({ article, dateMode, showThumbnails, onClick, titleTranslated
             isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
           }`}
         >
-          {titleTranslated ?? article.title}
+          {titleTranslated ? <><Languages size={12} className="inline-block align-[-1px] mr-0.5 opacity-50 shrink-0" />{titleTranslated}</> : article.title}
         </span>
         {titleTranslated && (
           <span className="text-[11px] text-muted truncate block">{article.title}</span>
@@ -426,7 +426,7 @@ function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, o
               isUnread ? 'font-medium text-text' : 'font-normal text-muted'
             }`}
           >
-            {titleTranslated ?? article.title}
+            {titleTranslated ? <><Languages size={12} className="inline-block align-[-1px] mr-0.5 opacity-50 shrink-0" />{titleTranslated}</> : article.title}
           </span>
           {titleTranslated && (
             <span className="text-[11px] text-muted truncate">{article.title}</span>
