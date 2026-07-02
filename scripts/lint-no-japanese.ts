@@ -44,6 +44,9 @@ const ALLOWLIST: RegExp[] = [
   // OPA policy tests (contain Japanese string assertions)
   /^policy\//,
 
+  // Fork planning doc — written in Chinese
+  /^PLAN\.md$/,
+
   // Fetcher uses Japanese punctuation in sentence-splitting regex
   /^server\/fetcher\/content\.ts$/,
 ]
