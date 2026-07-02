@@ -16,6 +16,7 @@ import { SwipeableArticleCard } from './swipeable-article-card'
 import { articleUrlToPath } from '../../lib/url'
 import { ArticleOverlay } from './article-overlay'
 import { PullToRefresh } from '../layout/pull-to-refresh'
+import { FeedMetricsBar } from '../feed/feed-metrics-bar'
 import { useFetchProgressContext } from '../../contexts/fetch-progress-context'
 import { toast } from 'sonner'
 import { Mascot } from '../ui/mascot'
@@ -140,7 +141,7 @@ export const ArticleList = forwardRef<ArticleListHandle, ArticleListProps>(funct
   const bookmarkedOnly = isBookmarks
   const likedOnly = isLikes
   const readOnly = isHistory || readFilter === 'read'
-  const { autoMarkRead, dateMode, indicatorStyle, layout, articleOpenMode, keyboardNavigation, keybindings, translateTitleAuto, translateTargetLang } = settings
+  const { autoMarkRead, dateMode, indicatorStyle, layout, articleOpenMode, keyboardNavigation, keybindings, translateTitleAuto, translateTargetLang, showFeedActivity } = settings
   const [overlayUrl, setOverlayUrl] = useState<string | null>(null)
   const [noFloor, setNoFloor] = useState(false)
   const [titleTranslations, setTitleTranslations] = useState<Map<number, string>>(new Map())
@@ -839,6 +840,10 @@ export const ArticleList = forwardRef<ArticleListHandle, ArticleListProps>(funct
           isSelectionMode={isSelectionMode}
           onEnterSelectionMode={() => setSelectionActive(true)}
         />
+      )}
+
+      {currentFeed && currentFeed.type !== 'clip' && showFeedActivity === 'on' && (
+        <FeedMetricsBar feed={currentFeed} />
       )}
 
       {isLoading && <ArticleListSkeleton layout={layout} showThumbnails={displayConfig.showThumbnails} />}
