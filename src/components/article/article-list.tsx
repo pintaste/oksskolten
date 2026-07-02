@@ -104,8 +104,8 @@ export interface ArticleListHandle {
 /** Returns true if the title text already appears to be in the target language. */
 function titleAlreadyInLang(title: string, targetLang: string): boolean {
   const len = title.length || 1
-  const kana = (title.match(/[぀-ヿ]/g) || []).length
-  const cjk  = (title.match(/[一-鿿]/g) || []).length
+  const kana = (title.match(/[\u3040-\u30FF]/g) || []).length
+  const cjk  = (title.match(/[\u4E00-\u9FFF]/g) || []).length
   if (targetLang === 'ja') return (kana + cjk) / len > 0.15
   if (targetLang === 'zh') return kana / len < 0.02 && cjk / len > 0.15
   return false

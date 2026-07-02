@@ -81,8 +81,8 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
   const titleTarget = translateTargetLang || locale
   const titleAlreadyInLang = article ? (() => {
     const t = article.title; const len = t.length || 1
-    const kana = (t.match(/[぀-ヿ]/g) || []).length
-    const cjk  = (t.match(/[一-鿿]/g) || []).length
+    const kana = (t.match(/[\u3040-\u30FF]/g) || []).length
+    const cjk  = (t.match(/[\u4E00-\u9FFF]/g) || []).length
     if (titleTarget === 'ja') return (kana + cjk) / len > 0.15
     if (titleTarget === 'zh') return kana / len < 0.02 && cjk / len > 0.15
     return false
