@@ -267,21 +267,26 @@ function ArticleListPage() {
                 onMouseDown={handleResizeMouseDown}
               />
               {/* Article detail panel */}
-              <div className="flex-1 overflow-y-auto relative">
-                <button
-                  onClick={toggleDetail}
-                  className="absolute top-2 right-2 p-1.5 rounded text-muted hover:text-text hover:bg-accent/15 transition-colors z-10"
-                  title="Close detail panel"
-                >
-                  <PanelRightClose size={16} />
-                </button>
-                {splitUrl ? (
-                  <ArticleDetail articleUrl={splitUrl} />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted text-sm select-none">
-                    {t('settings.splitViewEmpty')}
-                  </div>
-                )}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Toolbar */}
+                <div className="flex items-center justify-end px-2 h-9 shrink-0 border-b border-border">
+                  <button
+                    onClick={toggleDetail}
+                    className="p-1.5 rounded text-muted hover:text-text hover:bg-accent/15 transition-colors"
+                    title="Close detail panel"
+                  >
+                    <PanelRightClose size={16} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {splitUrl ? (
+                    <ArticleDetail articleUrl={splitUrl} />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted text-sm select-none">
+                      {t('settings.splitViewEmpty')}
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
