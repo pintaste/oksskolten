@@ -243,21 +243,25 @@ function ArticleListPage() {
         {hints}
         <div className="flex" style={{ height: 'calc(100vh - 48px)' }}>
           {/* Article list panel */}
-          <div className="shrink-0 overflow-y-auto relative" style={{ width: detailCollapsed ? '100%' : splitPanelWidth }}>
-            <ArticleList
-              ref={articleListRef}
-              onSplitOpen={handleSplitOpen}
-              selectedUrl={splitUrl}
-            />
+          <div className="shrink-0 flex flex-col" style={{ width: detailCollapsed ? '100%' : splitPanelWidth }}>
             {detailCollapsed && (
-              <button
-                onClick={toggleDetail}
-                className="absolute top-2 right-2 p-1.5 rounded text-muted hover:text-text hover:bg-accent/15 transition-colors"
-                title="Open detail panel"
-              >
-                <PanelRightOpen size={16} />
-              </button>
+              <div className="flex items-center justify-end px-2 h-9 shrink-0 border-b border-border">
+                <button
+                  onClick={toggleDetail}
+                  className="p-1.5 rounded text-muted hover:text-text hover:bg-accent/15 transition-colors"
+                  title="Open detail panel"
+                >
+                  <PanelRightOpen size={16} />
+                </button>
+              </div>
             )}
+            <div className="flex-1 overflow-y-auto">
+              <ArticleList
+                ref={articleListRef}
+                onSplitOpen={handleSplitOpen}
+                selectedUrl={splitUrl}
+              />
+            </div>
           </div>
           {!detailCollapsed && (
             <>
