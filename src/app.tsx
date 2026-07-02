@@ -24,6 +24,7 @@ import { HintBanner } from './components/ui/hint-banner'
 import { Toaster } from 'sonner'
 import { FetchProgressProvider } from './contexts/fetch-progress-context'
 import { TooltipProvider } from './components/ui/tooltip'
+import { PanelRightClose, PanelRightOpen } from 'lucide-react'
 
 export interface AppLayoutContext {
   settings: Settings
@@ -174,6 +175,23 @@ function ArticleListPage() {
     return n >= 200 && n <= 640 ? n : 360
   })
 
+  const [detailCollapsed, setDetailCollapsed] = useState(() =>
+    localStorage.getItem('split-detail-collapsed') === 'true'
+  )
+  const toggleDetail = useCallback(() => {
+    setDetailCollapsed(prev => {
+      localStorage.setItem('split-detail-collapsed', String(!prev))
+      return !prev
+    })
+  }, [])
+  const handleSplitOpen = useCallback((url: string) => {
+    setSplitUrl(url)
+    if (detailCollapsed) {
+      setDetailCollapsed(false)
+      localStorage.setItem('split-detail-collapsed', 'false')
+    }
+  }, [detailCollapsed])
+
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     const startX = e.clientX
@@ -225,28 +243,48 @@ function ArticleListPage() {
         {hints}
         <div className="flex" style={{ height: 'calc(100vh - 48px)' }}>
           {/* Article list panel */}
-          <div className="shrink-0 overflow-y-auto" style={{ width: splitPanelWidth }}>
+          <div className="shrink-0 overflow-y-auto relative" style={{ width: detailCollapsed ? '100%' : splitPanelWidth }}>
             <ArticleList
               ref={articleListRef}
-              onSplitOpen={setSplitUrl}
+              onSplitOpen={handleSplitOpen}
               selectedUrl={splitUrl}
             />
-          </div>
-          {/* Resize handle */}
-          <div
-            className="w-1 shrink-0 cursor-col-resize border-r border-border hover:bg-accent/20 transition-colors"
-            onMouseDown={handleResizeMouseDown}
-          />
-          {/* Article detail panel */}
-          <div className="flex-1 overflow-y-auto">
-            {splitUrl ? (
-              <ArticleDetail articleUrl={splitUrl} />
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted text-sm select-none">
-                {t('settings.splitViewEmpty')}
-              </div>
+            {detailCollapsed && (
+              <button
+                onClick={toggleDetail}
+                className="absolute top-2 right-2 p-1.5 rounded text-muted hover:text-text hover:bg-accent/15 transition-colors"
+                title="Open detail panel"
+              >
+                <PanelRightOpen size={16} />
+              </button>
             )}
           </div>
+          {!detailCollapsed && (
+            <>
+              {/* Resize handle */}
+              <div
+                className="w-1 shrink-0 cursor-col-resize border-r border-border hover:bg-accent/20 transition-colors"
+                onMouseDown={handleResizeMouseDown}
+              />
+              {/* Article detail panel */}
+              <div className="flex-1 overflow-y-auto relative">
+                <button
+                  onClick={toggleDetail}
+                  className="absolute top-2 right-2 p-1.5 rounded text-muted hover:text-text hover:bg-accent/15 transition-colors z-10"
+                  title="Close detail panel"
+                >
+                  <PanelRightClose size={16} />
+                </button>
+                {splitUrl ? (
+                  <ArticleDetail articleUrl={splitUrl} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted text-sm select-none">
+                    {t('settings.splitViewEmpty')}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </PageLayout>
     )

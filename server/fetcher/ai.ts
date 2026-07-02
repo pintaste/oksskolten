@@ -17,8 +17,12 @@ export interface AiTextResult {
 
 export function detectLanguage(fullText: string): string {
   const sample = fullText.slice(0, 1000)
-  const jaCount = (sample.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g) || []).length
-  return jaCount / sample.length > 0.1 ? 'ja' : 'en'
+  const len = sample.length || 1
+  const kana = (sample.match(/[\u3040-\u30FF]/g) || []).length  // hiragana + katakana
+  const cjk  = (sample.match(/[\u4E00-\u9FFF]/g) || []).length  // shared CJK ideographs
+  if (kana / len > 0.02) return 'ja'   // hiragana/katakana present \u2192 Japanese
+  if (cjk  / len > 0.1)  return 'zh'   // CJK only, no kana \u2192 Chinese
+  return 'en'
 }
 
 
@@ -138,7 +142,7 @@ export async function translateTitle(title: string): Promise<string> {
     return result.translatedText
   }
   const source = sourceLang && sourceLang !== targetLang ? ` from ${languageName(sourceLang)}` : ''
-  const prompt = `Translate the following article title${source} into ${languageName(targetLang)}. Output only the translated title, nothing else.\n\n${title}`
+  const prompt = `Translate the following article title${source} into ${languageName(targetLang)}. Keep proper nouns, brand names, product names, and technical terms in their original form. Output only the translated title, nothing else.\n\n${title}`
   const config: AiTaskConfig = { ...translateConfig, buildPrompt: () => prompt }
   const r = await runAiTask(config, title)
   return r.text.trim()

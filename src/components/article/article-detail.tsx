@@ -78,7 +78,16 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
   const { data: article, error, mutate } = useSWR<ArticleDetailData>(articleKey, fetcher)
   const { mutate: globalMutate } = useSWRConfig()
 
-  const isUserLang = article?.lang === (translateTargetLang || locale)
+  const titleTarget = translateTargetLang || locale
+  const titleAlreadyInLang = article ? (() => {
+    const t = article.title; const len = t.length || 1
+    const kana = (t.match(/[぀-ヿ]/g) || []).length
+    const cjk  = (t.match(/[一-鿿]/g) || []).length
+    if (titleTarget === 'ja') return (kana + cjk) / len > 0.15
+    if (titleTarget === 'zh') return kana / len < 0.02 && cjk / len > 0.15
+    return false
+  })() : false
+  const isUserLang = article?.lang === (translateTargetLang || locale) || titleAlreadyInLang
   const translateTarget = translateTargetLang || locale
   const translateSource = translateSourceLang || ''
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
@@ -283,7 +292,7 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
       <article ref={articleRef} className="article-card max-w-2xl mx-auto px-6 md:px-10 py-8">
       {/* Title */}
       <h1 className="mb-1.5 text-[28px] font-bold leading-[1.3] break-words [overflow-wrap:anywhere]">
-        {(translateTitleAuto === 'on' && article.title_translated) ? article.title_translated : article.title}
+        {(translateTitleAuto === 'on' && !isUserLang && article.title_translated) ? article.title_translated : article.title}
       </h1>
 
       {/* Date */}

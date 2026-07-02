@@ -101,6 +101,16 @@ export interface ArticleListHandle {
   revalidate: () => void
 }
 
+/** Returns true if the title text already appears to be in the target language. */
+function titleAlreadyInLang(title: string, targetLang: string): boolean {
+  const len = title.length || 1
+  const kana = (title.match(/[぀-ヿ]/g) || []).length
+  const cjk  = (title.match(/[一-鿿]/g) || []).length
+  if (targetLang === 'ja') return (kana + cjk) / len > 0.15
+  if (targetLang === 'zh') return kana / len < 0.02 && cjk / len > 0.15
+  return false
+}
+
 interface ArticleListProps {
   onSplitOpen?: (url: string) => void
   selectedUrl?: string | null
@@ -141,7 +151,7 @@ export const ArticleList = forwardRef<ArticleListHandle, ArticleListProps>(funct
     showThumbnails: settings.showThumbnails === 'on',
   }), [dateMode, indicatorStyle, settings.showUnreadIndicator, settings.showThumbnails])
   const isGridLayout = layout === 'card' || layout === 'magazine'
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const { progress, startFeedFetch } = useFetchProgressContext()
   const { mutate: globalMutate } = useSWRConfig()
   const getKey = useCallback((pageIndex: number, previousPageData: ArticlesResponse | null) => {
@@ -912,6 +922,8 @@ export const ArticleList = forwardRef<ArticleListHandle, ArticleListProps>(funct
             isSelected: selectedIds.has(article.id),
             onSelect: handleSelect,
             titleTranslated: translateTitleAuto === 'on'
+              && article.lang !== (translateTargetLang || locale)
+              && !titleAlreadyInLang(article.title, translateTargetLang || locale)
               ? (titleTranslations.get(article.id) ?? effectiveArticle.title_translated ?? undefined)
               : undefined,
             ...displayConfig,
