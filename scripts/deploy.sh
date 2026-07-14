@@ -9,8 +9,9 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 log "=== Deploy started ==="
 cd "$REPO_DIR"
 
-log "Pulling latest code..."
-git pull origin main
+log "Fetching latest code..."
+git fetch origin main
+git reset --hard origin/main
 
 export GIT_COMMIT="$(git rev-parse --short HEAD)"
 export GIT_TAG="$(git describe --tags --exact-match 2>/dev/null || echo unknown)"
