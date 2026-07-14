@@ -315,7 +315,11 @@ export const ArticleList = forwardRef<ArticleListHandle, ArticleListProps>(funct
     },
     onOpenExternal: (id) => {
       const article = articleMap.get(id)
-      if (article?.url) { window.open(article.url, '_blank', 'noopener,noreferrer'); window.focus() }
+      if (article?.url) {
+        window.open(article.url, '_blank', 'noopener,noreferrer')
+        window.focus()
+        markRead(article.id)
+      }
     },
     onNearEnd: () => loadMoreRef.current(),
     enabled: isKeyboardNavEnabled,

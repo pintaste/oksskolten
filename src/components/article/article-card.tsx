@@ -142,6 +142,7 @@ function CardActions({ article, isUnread, onToggleBookmark, onToggleRead, onOpen
           rel="noopener noreferrer"
           title={t('articles.openExternal')}
           onClick={e => { e.stopPropagation(); onOpenExternal(article) }}
+          onContextMenu={() => onOpenExternal(article)}
           className="p-1 rounded text-muted hover:text-accent hover:bg-hover transition-colors"
         >
           <ExternalLink size={14} />
