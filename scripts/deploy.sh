@@ -12,7 +12,11 @@ cd "$REPO_DIR"
 log "Pulling latest code..."
 git pull origin main
 
-log "Rebuilding and restarting containers..."
+export GIT_COMMIT="$(git rev-parse --short HEAD)"
+export GIT_TAG="$(git describe --tags --exact-match 2>/dev/null || echo unknown)"
+export BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+log "Rebuilding and restarting containers (commit ${GIT_COMMIT})..."
 make prod
 
 log "=== Deploy finished ==="
