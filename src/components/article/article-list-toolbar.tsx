@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { CheckCheck, CheckSquare, ListChecks, ListFilter, List, Eye } from 'lucide-react'
+import { CheckCheck, CheckSquare, ListChecks } from 'lucide-react'
 import { useI18n } from '../../lib/i18n'
 
 type ReadFilter = 'all' | 'unread' | 'read'
@@ -117,28 +117,34 @@ export function ArticleListToolbar({
     )
   }
 
-  const nextFilter: ReadFilter = readFilter === 'all' ? 'unread' : readFilter === 'unread' ? 'read' : 'all'
-  const filterConfig = {
-    all:    { icon: <List size={13} />,       label: t('articles.showAll'),    active: false },
-    unread: { icon: <ListFilter size={13} />, label: t('articles.unreadOnly'), active: true  },
-    read:   { icon: <Eye size={13} />,        label: t('articles.readOnly'),   active: true  },
-  }
-  const fc = filterConfig[readFilter]
+  const filterOptions: { key: ReadFilter; label: string }[] = [
+    { key: 'all', label: t('articles.showAll') },
+    { key: 'unread', label: t('articles.unreadOnly') },
+    { key: 'read', label: t('articles.readOnly') },
+  ]
 
   return (
     <div className="flex items-center justify-between px-4 md:px-6 py-1 border-b border-border select-none">
       <div className="flex items-center gap-2">
         {showReadFilter && (
-          <button
-            type="button"
-            onClick={() => onChangeReadFilter(nextFilter)}
-            className={`inline-flex items-center gap-1 text-xs transition-colors ${
-              fc.active ? 'text-accent font-medium' : 'text-muted hover:text-text'
-            }`}
-          >
-            {fc.icon}
-            {fc.label}
-          </button>
+          <div className="flex items-center border border-border rounded overflow-hidden" role="group" aria-label={t('articles.readFilter')}>
+            {filterOptions.map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onChangeReadFilter(key)}
+                aria-pressed={readFilter === key}
+                className={[
+                  'px-2.5 py-0.5 text-xs transition-colors',
+                  readFilter === key
+                    ? 'bg-accent text-accent-text font-medium'
+                    : 'text-muted hover:text-text hover:bg-hover',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         )}
       </div>
       <div className="flex items-center gap-3">
