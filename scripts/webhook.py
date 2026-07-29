@@ -44,12 +44,19 @@ def verify_signature(secret: bytes, body: bytes, sig_header: str) -> bool:
 
 
 class WebhookHandler(http.server.BaseHTTPRequestHandler):
+    # Bound incomplete/slowloris requests so one hung client cannot stall the server.
+    timeout = 10
+
     def do_POST(self):  # noqa: N802
         if self.path != "/webhook":
             self._respond(404)
             return
 
         length = int(self.headers.get("Content-Length", 0))
+        # Cap body size (GitHub push payloads are small).
+        if length < 0 or length > 1_000_000:
+            self._respond(413)
+            return
         body = self.rfile.read(length)
 
         try:
@@ -94,6 +101,13 @@ class WebhookHandler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+class ThreadingHTTPServer(http.server.ThreadingHTTPServer):
+    """Daemon threads so systemd stop is not blocked by lingering connections."""
+
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 if __name__ == "__main__":
     log.info("Webhook receiver listening on :%d (branch=%s)", PORT, DEPLOY_BRANCH)
-    http.server.HTTPServer(("", PORT), WebhookHandler).serve_forever()
+    ThreadingHTTPServer(("", PORT), WebhookHandler).serve_forever()
