@@ -127,7 +127,7 @@ export function ArticleListToolbar({
     <div className="flex items-center justify-between px-4 md:px-6 py-1 border-b border-border select-none">
       <div className="flex items-center gap-2">
         {showReadFilter && (
-          <div className="flex items-center border border-border rounded overflow-hidden" role="group" aria-label={t('articles.readFilter')}>
+          <div className="flex items-center rounded overflow-hidden" role="group" aria-label={t('articles.readFilter')}>
             {filterOptions.map(({ key, label }) => (
               <button
                 key={key}
@@ -135,7 +135,7 @@ export function ArticleListToolbar({
                 onClick={() => onChangeReadFilter(key)}
                 aria-pressed={readFilter === key}
                 className={[
-                  'px-2.5 py-0.5 text-xs transition-colors',
+                  'px-2.5 py-0.5 text-xs rounded transition-colors',
                   readFilter === key
                     ? 'bg-accent text-accent-text font-medium'
                     : 'text-muted hover:text-text hover:bg-hover',
