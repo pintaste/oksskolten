@@ -631,4 +631,43 @@ describe('POST /api/opml with selectedUrls', () => {
     expect(data.imported).toBe(1)
     expect(data.skipped).toBe(1)
   })
+
+  it('returns 400 when selectedUrls is malformed JSON', async () => {
+    const { body, contentType } = buildMultipart({
+      file: { filename: 'feeds.opml', content: sampleOpml },
+      selectedUrls: { content: 'not-json{' },
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/opml',
+      headers: { 'content-type': contentType },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(400)
+    const data = res.json()
+    expect(data.error).toMatch(/JSON/i)
+
+    // Nothing should be imported
+    const { getFeeds } = await import('../db.js')
+    expect(getFeeds()).toHaveLength(0)
+  })
+
+  it('returns 400 when selectedUrls is a non-string-array', async () => {
+    const { body, contentType } = buildMultipart({
+      file: { filename: 'feeds.opml', content: sampleOpml },
+      selectedUrls: { content: JSON.stringify(['https://xkcd.com', 42]) },
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/opml',
+      headers: { 'content-type': contentType },
+      payload: body,
+    })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toMatch(/array of strings/i)
+  })
 })

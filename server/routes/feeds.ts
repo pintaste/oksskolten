@@ -435,7 +435,17 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
     const selectedUrlsRaw = file.fields?.selectedUrls
     let selectedUrlSet: Set<string> | null = null
     if (selectedUrlsRaw && typeof selectedUrlsRaw === 'object' && 'value' in selectedUrlsRaw) {
-      const urls: string[] = JSON.parse((selectedUrlsRaw as { value: string }).value)
+      let urls: string[]
+      try {
+        urls = JSON.parse((selectedUrlsRaw as { value: string }).value)
+      } catch {
+        reply.status(400).send({ error: 'Invalid selectedUrls JSON' })
+        return
+      }
+      if (!Array.isArray(urls) || urls.some(u => typeof u !== 'string')) {
+        reply.status(400).send({ error: 'selectedUrls must be an array of strings' })
+        return
+      }
       selectedUrlSet = new Set(urls)
     }
 
