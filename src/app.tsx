@@ -210,6 +210,7 @@ function ArticleListPage() {
   // Reset selected article when navigating to a different feed/section
   useEffect(() => { setSplitUrl(null) }, [location.pathname])
 
+  // Split needs horizontal room for list + detail; below md use full-page navigation.
   const isSplitMode = settings.articleOpenMode === 'split' && isDesktop
 
   const hints = (

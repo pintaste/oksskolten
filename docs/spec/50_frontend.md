@@ -171,7 +171,7 @@ Three ways to open an article from the list. Independent from list layout.
 |---|---|---|
 | Full page | `page` | Navigates to the article detail route. Default |
 | Overlay | `overlay` | Opens the article in a right-hand overlay without leaving the list |
-| Split view | `split` | Desktop three-column layout: sidebar \| article list \| detail panel. Below the `md` breakpoint (768px), falls back to full-page navigation |
+| Split view | `split` | Desktop three-column layout: sidebar \| article list \| detail panel. Below the `md` breakpoint (768px) — phones and narrow windows — the preference is kept but the UI falls back to **full-page** navigation (same as `page`): no side-by-side detail panel, list clicks navigate to the detail route |
 
 - Setting key: `reading.article_open_mode` (allowed values: `page` / `overlay` / `split`)
 - Settings page: Selectable with preview cards under Reading

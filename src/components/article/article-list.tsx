@@ -151,7 +151,10 @@ export const ArticleList = forwardRef<ArticleListHandle, ArticleListProps>(funct
   }, [articles])
 
   const isOverlayMode = articleOpenMode === 'overlay'
-  const isSplitMode = articleOpenMode === 'split'
+  // Only treat as split when the parent actually mounts the detail panel
+  // (desktop). On narrow viewports the preference stays "split" but the list
+  // falls back to full-page navigation — onSplitOpen is not provided.
+  const isSplitMode = articleOpenMode === 'split' && !!onSplitOpen
   // Short debounce after overlay close to prevent Escape from immediately clearing focus
   const escapeDebounceRef = useRef(false)
 
@@ -174,7 +177,7 @@ export const ArticleList = forwardRef<ArticleListHandle, ArticleListProps>(funct
       }
     },
     onEnter: (isOverlayMode || isSplitMode) ? undefined : (id) => {
-      // Page mode: Enter to navigate
+      // Page mode (and split preference on mobile): Enter to navigate
       const article = articleMap.get(id)
       if (article) {
         void navigate(articleUrlToPath(article.url))
@@ -493,13 +496,13 @@ export const ArticleList = forwardRef<ArticleListHandle, ArticleListProps>(funct
             ? { ...article, seen_at: article.seen_at ?? new Date().toISOString() }
             : article
           const handleListOpen =
-            articleOpenMode === 'overlay'
+            isOverlayMode
               ? (e: React.MouseEvent<HTMLAnchorElement>) => {
                   if (e.metaKey || e.ctrlKey || e.button === 1) return
                   e.preventDefault()
                   setOverlayUrl(article.url)
                 }
-              : articleOpenMode === 'split' && onSplitOpen
+              : isSplitMode && onSplitOpen
                 ? (e: React.MouseEvent<HTMLAnchorElement>) => {
                     if (e.metaKey || e.ctrlKey || e.button === 1) return
                     e.preventDefault()
