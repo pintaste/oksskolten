@@ -112,6 +112,8 @@ function isIdempotentError(err: unknown): boolean {
 /**
  * Run SQL statements one-by-one, skipping ones that fail due to
  * already-applied schema changes (duplicate column, missing column, etc.).
+ * Runs within the caller's transaction so a failure rolls back all
+ * statements in the migration.
  */
 function execSafe(sql: string, file: string) {
   const statements = sql
@@ -155,21 +157,33 @@ export function runMigrations() {
   for (const file of files) {
     if (applied.has(file)) continue
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8')
+    // foreign_keys pragma must be toggled outside a transaction (it is a
+    // no-op to change mid-transaction). Disable before, re-enable after.
     if (!remote) db.pragma('foreign_keys = OFF')
     try {
-      db.exec(sql)
-    } catch (err: unknown) {
-      if (isIdempotentError(err)) {
-        // Partially-applied migration — run each statement individually,
-        // skipping ones that conflict with existing schema.
-        log.warn(`Migration ${file}: partial conflict (${(err as Error).message}), applying statement-by-statement`)
-        execSafe(sql, file)
-      } else {
-        throw err
-      }
+      // Run the schema change(s) and record the migration in one
+      // transaction so a failure rolls the whole migration back — the
+      // _migrations row is only committed when the SQL fully succeeds,
+      // and a partial apply never leaves half-applied schema behind.
+      db.transaction(() => {
+        try {
+          db.exec(sql)
+        } catch (err: unknown) {
+          if (isIdempotentError(err)) {
+            // Partially-applied migration — run each statement
+            // individually, skipping ones that conflict with existing
+            // schema.
+            log.warn(`Migration ${file}: partial conflict (${(err as Error).message}), applying statement-by-statement`)
+            execSafe(sql, file)
+          } else {
+            throw err
+          }
+        }
+        db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(file)
+      })()
+    } finally {
+      if (!remote) db.pragma('foreign_keys = ON')
     }
-    if (!remote) db.pragma('foreign_keys = ON')
-    db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(file)
     log.info(`Migration applied: ${file}`)
   }
 }

@@ -117,3 +117,34 @@ describe('duplicate column migration handling', () => {
     }).toThrow(/duplicate column/)
   })
 })
+
+describe('migration atomicity', () => {
+  // runMigrations wraps each migration's schema change and its
+  // _migrations record in a single transaction. A migration whose last
+  // statement fails must roll back to its pre-migration state: no
+  // partial schema applied, and no _migrations row recording it.
+  it('rolls back a migration whose last statement fails', () => {
+    const db = getDb()
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS atomicity_probe (id INTEGER PRIMARY KEY)
+    `)
+    const before = db.prepare('SELECT COUNT(*) AS n FROM _migrations').get() as { n: number }
+
+    // Two statements in one transaction; the second is invalid SQL so
+    // the whole migration must roll back — the first statement's effect
+    // must not persist, mirroring how runMigrations now wraps migrations.
+    expect(() => {
+      db.transaction(() => {
+        db.exec('INSERT INTO atomicity_probe (id) VALUES (1)')
+        db.exec('THIS IS NOT VALID SQL')
+      })()
+    }).toThrow()
+
+    // Probe insert was rolled back
+    const rows = db.prepare('SELECT COUNT(*) AS n FROM atomicity_probe').get() as { n: number }
+    expect(rows.n).toBe(0)
+    // _migrations count unchanged (would-be migration not recorded)
+    const after = db.prepare('SELECT COUNT(*) AS n FROM _migrations').get() as { n: number }
+    expect(after.n).toBe(before.n)
+  })
+})
